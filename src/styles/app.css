@@ -171,7 +171,7 @@ a { color: var(--color-finish); text-underline-offset: 0.2em; }
   font: inherit;
   color: var(--color-ink);
   background: var(--color-surface);
-  border: var(--border);
+  border: 1px solid var(--color-ink-muted);
   border-radius: var(--radius);
   padding: var(--space-2) var(--space-3);
   min-height: 2.75rem;

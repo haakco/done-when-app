@@ -1,7 +1,7 @@
 # Done When design system
 
 The design contract for this app. Extend it; do not fork it. Tokens live in one file,
-`src/styles/tokens.css`; components use tokens, never literal colours or sizes.
+`src/styles/tokens.css`; components use tokens for colour, type, spacing and motion, never literal colours.
 
 ## Intent
 
@@ -22,8 +22,9 @@ It should feel personal and a little playful, never like an operations console.
   name → status → the big number and progress → forecast sentence → chart.
 - Owner tools (add measurement, import, links, lifecycle) sit below the answer in plain
   sections with headings, so share and owner pages read the same from the top.
-- Header: wordmark (home link), "New", "My items", "API". Skip link to `main`.
-- Below 40rem everything stacks; forms are one column.
+- Header: wordmark (home link), "New counter", "New project", "My items", "API" (new dashboard
+  starts from home). Skip link to `main`.
+- Grids (`.card-grid`, `.field-row`) wrap with `auto-fit`, so narrow screens stack without breakpoints.
 
 ## Type
 
@@ -40,7 +41,7 @@ Light (paper) is the default; dark (night sky ink) follows `prefers-color-scheme
 | --- | --- |
 | `--color-paper`, `--color-surface` | Page and card backgrounds |
 | `--color-ink`, `--color-ink-muted` | Text; muted text still meets 4.5:1 on paper and surface |
-| `--color-line` | Borders and rules |
+| `--color-line` | Decorative borders and rules (cards, tables); form controls use `--color-ink-muted` for 3:1 |
 | `--color-finish` | Target, primary action, focus ring — the finish line |
 | `--color-forecast` | Forecast line, band and interval text |
 | `--color-done`, `--color-warn`, `--color-stop` | Completed, stale / at risk, canceled / error |
@@ -74,7 +75,7 @@ heavy shadows. The progress bar is a thick rule with a finish tick at the target
 
 ## States
 
-Item pages: loading (skeleton text, not a spinner alone), not found or expired (with "start a
+Item pages: loading (a status line naming what is loading), not found or expired (with "start a
 new one"), read-only (owner tools absent, one line explaining the link is view-only), write
 failed (error next to the form, draft kept). CSV import lists bad rows by line number and adds
 nothing until the rows are fixed.
@@ -96,3 +97,4 @@ by Custd's share previews (A5). They use the same palette and the serif display 
 | 2026-11-17 | Own look: warm paper, ink, vermilion finish line, teal forecast; system font stacks only. |
 | 2026-11-17 | Plain CSS with tokens in `src/styles/tokens.css`; no CSS framework. |
 | 2026-11-17 | Reduced motion zeroes every duration token rather than per-component overrides. |
+| 2026-11-17 | Form control borders use `--color-ink-muted`, not `--color-line`, to meet 3:1 non-text contrast. |

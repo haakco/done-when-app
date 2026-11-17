@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { DEMO_LINKS } from "../data/placeholder";
+import { exampleShareTokens } from "../data";
 import { itemPath } from "../lib/links";
 
 const STARTS = [
@@ -29,13 +29,13 @@ export function HomePage() {
       <h2 className="section">See an example</h2>
       <ul>
         <li>
-          <Link to={itemPath("counter", "share", DEMO_LINKS.counter.shareToken)}>A counter: chapters drafted</Link>
+          <Link to={itemPath("counter", "share", exampleShareTokens.counter)}>A counter: chapters drafted</Link>
         </li>
         <li>
-          <Link to={itemPath("project", "share", DEMO_LINKS.project.shareToken)}>A project: kitchen renovation</Link>
+          <Link to={itemPath("project", "share", exampleShareTokens.project)}>A project: kitchen renovation</Link>
         </li>
         <li>
-          <Link to={itemPath("dashboard", "share", DEMO_LINKS.dashboard.shareToken)}>A dashboard: autumn goals</Link>
+          <Link to={itemPath("dashboard", "share", exampleShareTokens.dashboard)}>A dashboard: autumn goals</Link>
         </li>
       </ul>
     </>

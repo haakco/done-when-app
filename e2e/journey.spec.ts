@@ -27,3 +27,8 @@ test("bad CSV rows are listed by line and nothing is created", async ({ page }) 
   await expect(page.getByText("Line 2: “not-a-date” is not an ISO timestamp")).toBeVisible();
   await expect(page).toHaveURL(/\/new\/counter$/);
 });
+
+test("a missing link shows the not-found state without waiting on retries", async ({ page }) => {
+  await page.goto("/p/missing");
+  await expect(page.getByRole("heading", { name: "This project is not here" })).toBeVisible({ timeout: 2000 });
+});
