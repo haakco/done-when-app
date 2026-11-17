@@ -1,0 +1,7 @@
+# The SDK packages are installed from GitHub release tags and build their dist on install.
+onlyBuiltDependencies:
+  - "@haakco/custd-sdk"
+  - "@haakco/custd-react"
+  - esbuild
+# Ignore dependency versions published less than 36 hours ago (same guard as Custd).
+minimumReleaseAge: 2160
