@@ -1,0 +1,25 @@
+{
+  "indexFile": "index.html",
+  "notFoundPage": "404.html",
+  "spaFallbacks": [
+    { "prefix": "/new/", "file": "index.html" },
+    { "prefix": "/c/", "file": "index.html" },
+    { "prefix": "/p/", "file": "index.html" },
+    { "prefix": "/d/", "file": "index.html" },
+    { "prefix": "/edit/", "file": "index.html" },
+    { "prefix": "/mine/", "file": "index.html" },
+    { "prefix": "/api/", "file": "index.html" },
+    { "prefix": "/auth/", "file": "index.html" }
+  ],
+  "headers": [
+    {
+      "route": "/edit/**",
+      "headers": [
+        { "name": "Referrer-Policy", "value": "no-referrer" },
+        { "name": "X-Robots-Tag", "value": "noindex" }
+      ]
+    }
+  ],
+  "cache": [{ "match": "assets/**", "mode": "immutable" }],
+  "shareableRoutes": [{ "route": "/c/*" }, { "route": "/p/*" }, { "route": "/d/*" }]
+}

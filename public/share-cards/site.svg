@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Done When: when will it be done?">
+  <rect width="1200" height="630" fill="#1f1c17"/>
+  <text x="80" y="250" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="110" font-weight="700" fill="#f1ece2">Done When<tspan fill="#ff8a5b">?</tspan></text>
+  <text x="80" y="340" font-family="system-ui, sans-serif" font-size="40" fill="#b3ac9f">{{tagline}}</text>
+  <rect x="80" y="430" width="760" height="24" rx="12" fill="#5fd3c6"/>
+  <rect x="1060" y="400" width="8" height="84" fill="#ff8a5b"/>
+</svg>

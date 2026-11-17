@@ -195,6 +195,7 @@ a { color: var(--color-finish); text-underline-offset: 0.2em; }
   padding: 0 var(--space-3);
   font-size: var(--text-sm);
   font-weight: 600;
+  margin-bottom: var(--space-4);
 }
 
 .badge--active { color: var(--color-forecast); }
