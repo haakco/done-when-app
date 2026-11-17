@@ -1,0 +1,69 @@
+/* The only source of design values. See design/system.md. */
+:root {
+  color-scheme: light dark;
+
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2.1rem;
+  --text-hero: clamp(2.6rem, 7vw, 4.4rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  --width-page: 46rem;
+  --radius: 6px;
+  --border: 1px solid var(--color-line);
+  --focus-ring: 3px solid var(--color-finish);
+
+  --motion-fast: 120ms;
+  --motion-calm: 280ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --color-paper: #f6f2ea;
+  --color-surface: #fffdf8;
+  --color-ink: #1f1c17;
+  --color-ink-muted: #5b554b;
+  --color-line: #d8cfbf;
+  --color-finish: #b8410f;
+  --color-finish-ink: #ffffff;
+  --color-forecast: #0d6b64;
+  --color-forecast-soft: #d5ebe7;
+  --color-done: #2c6a2e;
+  --color-warn: #8a5200;
+  --color-stop: #a8231a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #15171c;
+    --color-surface: #1d2027;
+    --color-ink: #f1ece2;
+    --color-ink-muted: #b3ac9f;
+    --color-line: #3a3e48;
+    --color-finish: #ff8a5b;
+    --color-finish-ink: #1a0d06;
+    --color-forecast: #5fd3c6;
+    --color-forecast-soft: #1d3a38;
+    --color-done: #7fcf82;
+    --color-warn: #f0b85a;
+    --color-stop: #ff8a80;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-calm: 0ms;
+  }
+}
