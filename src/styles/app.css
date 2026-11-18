@@ -173,6 +173,7 @@ a { color: var(--color-finish); text-underline-offset: 0.2em; }
 
 .field-row {
   display: grid;
+  align-items: start;
   gap: var(--space-4);
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
 }
@@ -348,21 +349,21 @@ pre.code {
   --custd-chart-stale: var(--color-warn);
 }
 
-.chart--short { min-height: 10rem; }
 .chart svg { max-width: 100%; height: auto; display: block; }
 
 .chart [data-custd-chart-controls] {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  justify-content: flex-end;
+  gap: var(--space-1);
   margin-bottom: var(--space-2);
 }
 
 .chart [data-custd-chart-action] {
   font: inherit;
   font-size: var(--text-sm);
-  min-height: 2.25rem;
-  padding: var(--space-1) var(--space-3);
+  min-height: 2rem;
+  padding: 0 var(--space-2);
   border: 1px solid var(--color-ink-muted);
   border-radius: var(--radius);
   background: var(--color-surface);
@@ -401,7 +402,24 @@ pre.code {
   min-height: 2.75rem;
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+  list-style: none;
 }
+
+.more > summary::-webkit-details-marker { display: none; }
+
+.more > summary::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--color-finish);
+  border-bottom: 2px solid var(--color-finish);
+  transform: rotate(-45deg);
+  transition: transform var(--motion-fast) var(--ease);
+  flex: none;
+}
+
+.more[open] > summary::before { transform: rotate(45deg); }
 
 .more__body { padding-top: var(--space-3); display: grid; gap: var(--space-4); }
 
@@ -453,6 +471,7 @@ pre.code {
 
 @media (max-width: 30rem) {
   .form--inline { grid-template-columns: 1fr; }
+  .site-nav ul { gap: var(--space-3); }
   .summary,
   .card { padding: var(--space-4); }
   .summary__headline { font-size: var(--text-xl); }
@@ -463,5 +482,18 @@ pre.code {
 .entry { display: grid; gap: var(--space-2); align-content: start; }
 .entry p { margin: 0; }
 .entry .badge { margin: 0; justify-self: start; }
+.entry .button--quiet { justify-self: start; padding-inline: 0; }
 .entry__name { font-size: var(--text-lg); margin: 0; }
 .entry__headline { font-weight: 700; color: var(--color-forecast); }
+
+/* Grid children may shrink below their content, so long option text never widens the page. */
+.form > *,
+.field > *,
+.more__body > *,
+.stack > * { min-width: 0; }
+
+.field input,
+.field select,
+.field textarea { width: 100%; max-width: 100%; }
+
+.chart--short { min-height: 0; }

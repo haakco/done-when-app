@@ -12,7 +12,8 @@ import { ShareBox } from "../components/ShareBox";
 import { StatusBadge } from "../components/StatusBadge";
 import type { DoneWhenData, EstimateDraft, ItemAccess, Project } from "../data";
 import { projectOf } from "../data/live";
-import { dateInputToRfc3339, formatDate, rfc3339ToDateInput, todayDateInput } from "../lib/dates";
+import { dateInputToRfc3339, formatDate, formatShortDate, rfc3339ToDateInput, todayDateInput } from "../lib/dates";
+import { useNarrow } from "../lib/use-narrow";
 import { projectSummary } from "../lib/forecast-text";
 import type { ItemViewProps } from "./view-props";
 
@@ -24,6 +25,7 @@ export function ProjectView({ data, access, read, live, showOwnerTools, ownerRou
   const location = useLocation();
   const justCreated = (location.state as Partial<CreatedState> | null)?.created === true;
   const summary = projectSummary(project);
+  const narrow = useNarrow();
   const stale = project.status === "active" && project.latest !== null && project.latest.ageDays > STALE_AFTER_DAYS;
   return (
     <article aria-labelledby="item-name" className="item">
@@ -58,6 +60,8 @@ export function ProjectView({ data, access, read, live, showOwnerTools, ownerRou
           title={`${project.name}: estimates over time`}
           staleAfterDays={STALE_AFTER_DAYS}
           labels={{ empty: "The chart appears after the first estimate." }}
+          formatDate={formatShortDate}
+          {...(narrow ? { width: 380, height: 240 } : {})}
         />
       </figure>
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />

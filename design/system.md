@@ -18,10 +18,15 @@ It should feel personal and a little playful, never like an operations console.
 
 ## Layout and density
 
-- One centred column, `--width-page` wide, generous spacing. Item pages lead with the answer:
-  name → status → the big number and progress → forecast sentence → chart.
-- Owner tools (add measurement, import, links, lifecycle) sit below the answer in plain
-  sections with headings, so share and owner pages read the same from the top.
+- One centred column, `--width-page` wide, generous spacing. Item pages lead with one summary
+  card: the answer as a headline ("Likely done Nov 19"), one detail line, progress and pace.
+  Then, for the owner only, the share box (one "Copy share link" button) and the one common
+  write (add a measurement or an estimate), then the chart and the live line.
+- Everything else sits behind `.more` disclosures (`<details>`): forecast detail, several
+  measurements, forecast settings, runs, alerts, links and expiry. Share and owner pages read
+  the same from the top.
+- The home page holds the create-counter form itself: name, target, "Create counter"; every
+  other field waits behind "More options".
 - Header: wordmark (home link), "New counter", "New project", "My items", "API" (new dashboard
   starts from home). Skip link to `main`.
 - Grids (`.card-grid`, `.field-row`) wrap with `auto-fit`, so narrow screens stack without breakpoints.
@@ -69,15 +74,19 @@ heavy shadows. The progress bar is a thick rule with a finish tick at the target
 | `Field` (`.field`) | Label above control, hint and error below, error linked with `aria-describedby` and `aria-invalid` |
 | `StatusBadge` | Word + glyph + colour |
 | `Progress` | `<progress>`-equivalent with `role="progressbar"`, value text, finish tick |
-| `CopyLinkButton` | Copies a link; result announced in a polite live region; shows the link as text too |
-| Chart slots | `<figure>` with a caption naming the chart; reserved height so live updates do not shift layout |
-| `StateMessage` | Loading, not-found, read-only and error states with a next action |
+| `CopyButton` | Copies text; result announced in a polite live region; shows the text too |
+| `ShareBox` | Finish-colour bordered box under the summary; the owner's one-step share |
+| Charts | `@haakco/custd-react` `ForecastChart`, `ArrivalHistogram`, `ConvergenceStory` in `.chart`, coloured through the `--custd-chart-*` variables mapped to tokens; drawn smaller on phones so labels stay readable |
+| `LiveLine` | One quiet line: "Updates by itself", or stale / offline with what happens next |
+| `ItemStates` | Loading, not-here, read-only, write error and service-unavailable states, each with a next action |
+| `.more` | Disclosure with a finish-colour chevron; 2.75rem tall summary |
 
 ## States
 
 Item pages: loading (a status line naming what is loading), not found or expired (with "start a
 new one"), read-only (owner tools absent, one line explaining the link is view-only), write
-failed (error next to the form, draft kept). CSV import lists bad rows by line number and adds
+failed (plain-words error next to the form, draft kept), stale and offline (the live line says
+the page shows what it had and retries), data service unavailable (reload). CSV import lists bad rows by line number and adds
 nothing until the rows are fixed.
 
 ## Accessibility
@@ -98,3 +107,5 @@ by Custd's share previews (A5). They use the same palette and the serif display 
 | 2026-11-17 | Plain CSS with tokens in `src/styles/tokens.css`; no CSS framework. |
 | 2026-11-17 | Reduced motion zeroes every duration token rather than per-component overrides. |
 | 2026-11-17 | Form control borders use `--color-ink-muted`, not `--color-line`, to meet 3:1 non-text contrast. |
+| 2026-11-18 | Summary first, one share button, owner tools behind disclosures; the create-counter form lives on the home page. |
+| 2026-11-18 | Grid children get `min-width: 0` and controls `width: 100%`, so long option text never widens the page at 400px. |

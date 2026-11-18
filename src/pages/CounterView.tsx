@@ -15,9 +15,10 @@ import { ShareBox } from "../components/ShareBox";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Counter, DoneWhenData, ForecastMethod, ItemAccess, Measurement } from "../data";
 import { useCounter } from "../data/live";
-import { dateInputToRfc3339, rfc3339ToDateInput } from "../lib/dates";
+import { dateInputToRfc3339, formatShortDate, rfc3339ToDateInput } from "../lib/dates";
 import { counterSummary } from "../lib/forecast-text";
 import { formatRate, RATE_UNITS, ratePerSecond, type RateUnit } from "../lib/rate";
+import { useNarrow } from "../lib/use-narrow";
 import type { NewRunState } from "./NewCounterPage";
 import type { ItemViewProps } from "./view-props";
 
@@ -58,6 +59,7 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute }: 
 }
 
 function CounterChart({ counter, detail = false }: { counter: Counter; detail?: boolean }) {
+  const narrow = useNarrow();
   const forecast = counter.forecast;
   const chartData = {
     observations: counter.measurements.map((measurement) => ({ at: measurement.measuredAt, value: measurement.value })),
@@ -76,7 +78,9 @@ function CounterChart({ counter, detail = false }: { counter: Counter; detail?: 
         data={chartData}
         title={detail ? `${counter.name}: possible paths` : counter.name}
         labels={{ empty: "The chart appears after the first measurement.", noForecast: "The forecast line appears after three measurements." }}
-        formatValue={(value) => `${value.toLocaleString("en")}${counter.unit ? ` ${counter.unit}` : ""}`}
+        formatValue={(value) => value.toLocaleString("en", { maximumFractionDigits: 1 })}
+        formatDate={formatShortDate}
+        {...(narrow ? { width: 380, height: 260 } : {})}
       />
     </figure>
   );
@@ -97,7 +101,12 @@ function ForecastDetail({ counter }: { counter: Counter }) {
         <CounterChart counter={counter} detail />
         {forecast.histogram ? (
           <figure className="chart chart--short" aria-label="When the target is reached">
-            <ArrivalHistogram histogram={forecast.histogram} {...(counter.deadline ? { deadline: counter.deadline } : {})} title="When the target is reached" />
+            <ArrivalHistogram
+              histogram={forecast.histogram}
+              {...(counter.deadline ? { deadline: counter.deadline } : {})}
+              title="When the target is reached"
+              formatDate={formatShortDate}
+            />
           </figure>
         ) : null}
         {forecast.warnings.length > 0 ? (

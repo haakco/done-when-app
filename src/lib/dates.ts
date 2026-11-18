@@ -28,3 +28,10 @@ export function rfc3339ToDateInput(iso: string): string {
 export function todayDateInput(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
+
+const shortDateFormat = new Intl.DateTimeFormat("en", { day: "numeric", month: "short", timeZone: "UTC" });
+
+/** Chart axis dates, e.g. "Dec 3". */
+export function formatShortDate(epochMs: number): string {
+  return shortDateFormat.format(new Date(epochMs));
+}
