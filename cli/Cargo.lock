@@ -232,6 +232,7 @@ dependencies = [
 [[package]]
 name = "custd-sdk"
 version = "3.49.0"
+source = "git+https://github.com/haakco/custd-sdk?tag=v3.49.0#ebcf1cb5e892d389e3f499d6131563e6b4884d08"
 dependencies = [
  "serde",
  "serde_json",
