@@ -2,9 +2,10 @@
 
 use serde::Serialize;
 
+use crate::links::ItemKind;
 use crate::ops::{
-    AddReport, CreatedReport, EntryReport, EstimateReport, ItemReport, ListReport, LoginReport,
-    ShareReport, StatusReport,
+    AddReport, ClaimReport, CreatedReport, EntryReport, EstimateReport, ItemReport, ListReport,
+    LoginReport, MeetingReport, ShareReport, StatusReport,
 };
 
 pub trait Report: Serialize {
@@ -18,7 +19,7 @@ impl Report for CreatedReport {
             self.kind.label(),
             self.name,
             self.item_uuid,
-            self.share_url,
+            self.share_url.as_deref().unwrap_or("-"),
             self.name
         );
         if self.start_measurement_added {
@@ -59,10 +60,11 @@ impl Report for ItemReport {
         }
         match &self.forecast {
             Some(forecast) => lines.push(forecast.sentence()),
-            None if self.kind == crate::links::ItemKind::Counter => {
-                lines.push("No forecast yet.".to_owned())
-            }
+            None if self.kind == ItemKind::Counter => lines.push("No forecast yet.".to_owned()),
             None => {}
+        }
+        if let Some(meeting) = &self.meeting {
+            lines.extend(meeting_lines(meeting));
         }
         for estimate in &self.estimates {
             lines.push(format!(
@@ -87,25 +89,71 @@ impl Report for ItemReport {
     }
 }
 
+fn meeting_lines(meeting: &MeetingReport) -> Vec<String> {
+    let mut lines = Vec::new();
+    if let Some(ends_at) = &meeting.ends_at {
+        lines.push(format!("Planned to end: {ends_at}"));
+    }
+    if meeting.overrun_ms > 0 {
+        lines.push(format!("Overran by {}", minutes(meeting.overrun_ms)));
+    }
+    for (index, block) in meeting.blocks.iter().enumerate() {
+        let mut line = format!(
+            "{}. {} ({}, {} planned",
+            index + 1,
+            block.title,
+            block.status,
+            minutes(block.predicted_ms)
+        );
+        if block.actual_ms > 0 {
+            line.push_str(&format!(", {} taken", minutes(block.actual_ms)));
+        }
+        lines.push(line + ")");
+    }
+    lines
+}
+
+fn minutes(ms: i64) -> String {
+    let seconds = ms / 1000;
+    format!("{}m{:02}s", seconds / 60, seconds % 60)
+}
+
 impl Report for ListReport {
     fn text(&self) -> String {
-        let mut lines = Vec::new();
-        if self.signed_in {
-            lines.push("Signed in. Showing items saved on this machine (\"my items\" is not in the SDK yet).".to_owned());
-        }
+        let mut lines = vec![if self.signed_in {
+            "Your items and the items saved on this machine:".to_owned()
+        } else {
+            "Items saved on this machine (`done-when login` adds your items):".to_owned()
+        }];
         if self.items.is_empty() {
-            lines.push("No items saved here. Start one with `done-when new counter`.".to_owned());
+            lines = vec!["No items yet. Start one with `done-when new counter`.".to_owned()];
         }
         for item in &self.items {
+            let place = match (item.mine, item.saved_here) {
+                (true, true) => "yours, here",
+                (true, false) => "yours",
+                _ => "here",
+            };
             lines.push(format!(
-                "{:<24} {:<9} {:<5} {}",
+                "{:<24} {:<9} {:<5} {:<11} {}",
                 item.name,
-                item.kind.label(),
+                item.kind.map_or("item", ItemKind::label),
                 item.access,
+                place,
                 item.share_url.as_deref().unwrap_or("-")
             ));
         }
         lines.join("\n")
+    }
+}
+
+impl Report for ClaimReport {
+    fn text(&self) -> String {
+        format!(
+            "Claimed the {} {:?}: it is yours now, and `done-when list` shows it wherever you sign in.",
+            self.kind.label(),
+            self.name
+        )
     }
 }
 

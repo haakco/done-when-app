@@ -1,5 +1,6 @@
 //! A small in-memory Done When API on a std TcpListener: the discovery file, the app item routes
-//! and the app forecast routes, enough for the commands, `watch` and MCP to run end to end.
+//! (by link, or by `?item=` for the signed-in owner) and the app forecast routes, enough for the
+//! commands, `watch` and MCP to run end to end.
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
@@ -33,8 +34,10 @@ struct Item {
     kind: String,
     name: String,
     unit: String,
+    series_code: String,
+    owner_user: Option<String>,
     version: i64,
-    measurements: Vec<f64>,
+    measurements: Vec<(String, f64)>,
     forecast_version: Option<i64>,
     entries: Vec<(String, String)>,
     status: String,
@@ -45,9 +48,13 @@ struct State {
     items: Vec<Item>,
 }
 
+/// The only user token the fake verifies.
+pub const USER_TOKEN: &str = "user-token-1";
+
 pub struct FakeApi {
     pub base_url: String,
     log: Arc<Mutex<Vec<Received>>>,
+    state: Arc<Mutex<State>>,
 }
 
 impl FakeApi {
@@ -56,18 +63,42 @@ impl FakeApi {
         let base_url = format!("http://{}", listener.local_addr().unwrap());
         let log = Arc::new(Mutex::new(Vec::new()));
         let state = Arc::new(Mutex::new(State::default()));
-        let (server_log, server_base) = (log.clone(), base_url.clone());
+        let (server_log, server_base, server_state) =
+            (log.clone(), base_url.clone(), state.clone());
         thread::spawn(move || {
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
                 let request = read_request(&mut BufReader::new(stream.try_clone().unwrap()));
                 server_log.lock().unwrap().push(request.clone());
                 let (status, etag, body) =
-                    answer(&server_base, &mut state.lock().unwrap(), &request);
+                    answer(&server_base, &mut server_state.lock().unwrap(), &request);
                 write_answer(&mut stream, status, etag.as_deref(), &body);
             }
         });
-        Self { base_url, log }
+        Self {
+            base_url,
+            log,
+            state,
+        }
+    }
+
+    /// Adds a project (first series `estimate`) made elsewhere, optionally owned by a user;
+    /// its links are `own-<n>` and `shr-<n>`.
+    pub fn add_project(&self, name: &str, owner_user: Option<&str>) -> usize {
+        let mut state = self.state.lock().unwrap();
+        let index = state.items.len();
+        state.items.push(Item {
+            uuid: format!("item-{index}"),
+            kind: "measurement_project".to_owned(),
+            name: name.to_owned(),
+            unit: "Estimates".to_owned(),
+            series_code: "estimate".to_owned(),
+            owner_user: owner_user.map(str::to_owned),
+            version: 1,
+            status: "active".to_owned(),
+            ..Item::default()
+        });
+        index
     }
 
     pub fn requests(&self) -> Vec<Received> {
@@ -115,6 +146,29 @@ fn token_index(request: &Received) -> Option<(usize, bool)> {
     Some((index.parse().ok()?, role == "own"))
 }
 
+/// `?item=item-<n>` with no link: the signed-in owner's access.
+fn owned_index(state: &State, request: &Received, user: Option<&str>) -> Option<usize> {
+    let (_, query) = request.target.split_once("?item=")?;
+    let index: usize = query.strip_prefix("item-")?.parse().ok()?;
+    let item = state.items.get(index)?;
+    (user.is_some() && item.owner_user.as_deref() == user).then_some(index)
+}
+
+fn my_items(state: &State, user: &str) -> Value {
+    let items: Vec<Value> = state
+        .items
+        .iter()
+        .filter(|item| item.owner_user.as_deref() == Some(user))
+        .map(|item| {
+            let mut summary = item_read(item, true, Some(user))["item"].clone();
+            summary["name"] = json!(item.name);
+            summary["status"] = json!(item.status);
+            summary
+        })
+        .collect();
+    json!({ "items": items })
+}
+
 fn answer(base: &str, state: &mut State, request: &Received) -> (u16, Option<String>, String) {
     let path = request.target.split('?').next().unwrap_or("");
     if path == "/.well-known/custd.json" {
@@ -125,10 +179,23 @@ fn answer(base: &str, state: &mut State, request: &Received) -> (u16, Option<Str
                 "authorizationEndpoint": "x", "tokenEndpoint": "y", "redirectUri": "z" }
         }));
     }
-    if (request.method.as_str(), path) == ("POST", "/api/v1/app/items") {
-        return create(state, request);
+    let user = request.header("x-custd-user-token");
+    if user.is_some_and(|token| token != USER_TOKEN) {
+        return problem(401, "app_user_token_invalid");
     }
-    let Some((index, owner)) = token_index(request) else {
+    match (request.method.as_str(), path) {
+        ("POST", "/api/v1/app/items") => return create(state, request, user),
+        ("GET", "/api/v1/app/items") => {
+            return match user {
+                Some(user) => ok(my_items(state, user)),
+                None => problem(401, "app_user_token_required"),
+            };
+        }
+        _ => {}
+    }
+    let Some((index, owner)) = token_index(request)
+        .or_else(|| owned_index(state, request, user).map(|index| (index, true)))
+    else {
         return problem(401, "app_link_refused");
     };
     let Some(item) = state.items.get_mut(index) else {
@@ -138,10 +205,14 @@ fn answer(base: &str, state: &mut State, request: &Received) -> (u16, Option<Str
     if is_write && !owner {
         return problem(403, "app_link_read_only");
     }
-    route(item, request, path, owner)
+    route(item, request, path, owner, user)
 }
 
-fn create(state: &mut State, request: &Received) -> (u16, Option<String>, String) {
+fn create(
+    state: &mut State,
+    request: &Received,
+    user: Option<&str>,
+) -> (u16, Option<String>, String) {
     let body: Value = serde_json::from_str(&request.body).unwrap();
     let index = state.items.len();
     let kind = body["kind"].as_str().unwrap().to_owned();
@@ -155,12 +226,17 @@ fn create(state: &mut State, request: &Received) -> (u16, Option<String>, String
             .as_str()
             .unwrap_or("")
             .to_owned(),
+        series_code: body["measurementProject"]["series"][0]["seriesCode"]
+            .as_str()
+            .unwrap_or("")
+            .to_owned(),
+        owner_user: user.map(str::to_owned),
         kind,
         version: 1,
         status: "active".to_owned(),
         ..Item::default()
     });
-    let read = item_read(&state.items[index], true);
+    let read = item_read(&state.items[index], true, user);
     let created = json!({ "item": read, "ownerToken": format!("own-{index}"), "shareToken": format!("shr-{index}") });
     (201, None, created.to_string())
 }
@@ -170,17 +246,36 @@ fn route(
     request: &Received,
     path: &str,
     owner: bool,
+    user: Option<&str>,
 ) -> (u16, Option<String>, String) {
     let body: Value = serde_json::from_str(&request.body).unwrap_or(Value::Null);
     match (request.method.as_str(), path) {
-        ("GET", "/api/v1/app/item") => conditional(request, item.version, item_read(item, owner)),
+        ("GET", "/api/v1/app/item") => {
+            conditional(request, item.version, item_read(item, owner, user))
+        }
+        ("POST", "/api/v1/app/item/claim") => match (&item.owner_user, user) {
+            (_, None) => problem(401, "app_user_token_required"),
+            (Some(owner), Some(user)) if owner != user => problem(409, "app_item_claimed"),
+            (_, Some(user)) => {
+                item.owner_user = Some(user.to_owned());
+                ok(item_read(item, true, Some(user)))
+            }
+        },
+        ("GET", "/api/v1/app/forecast/story") => match item.forecast_version {
+            Some(version) => conditional(request, version, story(item)),
+            None => problem(404, "app_forecast_not_found"),
+        },
         ("POST", "/api/v1/app/item/measurements") => {
             let rows = body["rows"].as_array().unwrap();
             let results: Vec<Value> = (0..rows.len())
                 .map(|i| json!({ "rowIndex": i, "success": true, "status": 201, "observationUuid": format!("o-{i}") }))
                 .collect();
-            item.measurements
-                .extend(rows.iter().map(|r| r["value"].as_f64().unwrap()));
+            item.measurements.extend(rows.iter().map(|r| {
+                (
+                    r["observedAt"].as_str().unwrap().to_owned(),
+                    r["value"].as_f64().unwrap(),
+                )
+            }));
             item.version += 1;
             ok(
                 json!({ "importId": "imp-1", "accepted": rows.len(), "rejected": 0, "results": results }),
@@ -202,7 +297,7 @@ fn route(
         })),
         ("POST", "/api/v1/app/item/complete") => {
             item.status = "completed".to_owned();
-            ok(item_read(item, owner))
+            ok(item_read(item, owner, user))
         }
         ("POST", "/api/v1/app/item/entries") => {
             let token = body["token"].as_str().unwrap();
@@ -233,10 +328,16 @@ fn conditional(request: &Received, version: i64, body: Value) -> (u16, Option<St
     (200, Some(etag), body.to_string())
 }
 
-fn item_read(item: &Item, owner: bool) -> Value {
+fn item_read(item: &Item, owner: bool, user: Option<&str>) -> Value {
     let role = if owner { "owner" } else { "share" };
+    let ownership = match (&item.owner_user, user) {
+        (None, _) => "unowned",
+        (Some(owner), Some(user)) if owner == user => "yours",
+        _ => "other",
+    };
     let mut read = json!({
-        "item": { "itemUuid": item.uuid, "kind": item.kind, "role": role, "version": item.version,
+        "item": { "itemUuid": item.uuid, "kind": item.kind, "role": role, "ownership": ownership,
+            "version": item.version,
             "idleExpirySeconds": 604800, "updatedAt": "2026-11-18T00:00:00Z", "expiresAt": "2026-11-25T00:00:00Z" },
         "links": null
     });
@@ -257,7 +358,7 @@ fn item_read(item: &Item, owner: bool) -> Value {
     read["measurementProject"] = json!({
         "projectUuid": "p-1", "projectCode": "app-1", "kind": "deadline_forecast", "status": item.status,
         "name": item.name, "description": "",
-        "series": [{ "seriesUuid": "series-1", "seriesCode": "value", "name": item.unit, "unitSlug": "unitless",
+        "series": [{ "seriesUuid": "series-1", "seriesCode": item.series_code, "name": item.unit, "unitSlug": "unitless",
             "completionDirection": "increase", "source": "manual" }],
         "target": { "targetUuid": "t-1", "targetCode": "done", "name": item.name, "targetValue": 100.0,
             "targetDate": "2026-12-01T00:00:00Z", "completedAt": null, "state": "active" },
@@ -267,6 +368,28 @@ fn item_read(item: &Item, owner: bool) -> Value {
     });
     read["estimates"] = json!({ "deliveryTargetDate": null, "estimates": [], "latest": null });
     read
+}
+
+/// The story's measurements; the chart and tables Custd compiles are left empty.
+fn story(item: &Item) -> Value {
+    let observations: Vec<Value> = item
+        .measurements
+        .iter()
+        .map(|(at, value)| json!({ "observedAt": at, "value": value }))
+        .collect();
+    json!({
+        "projectUuid": "p-1", "projectName": item.name, "projectKind": "deadline_forecast",
+        "state": "ready", "currentSnapshotUuid": null, "truncated": false,
+        "target": { "available": true, "label": item.name, "value": 100.0, "deadline": null },
+        "observations": observations, "snapshots": [], "prediction": null,
+        "delivery": { "targetDate": null, "estimates": [] },
+        "presentation": { "version": 1, "presetId": "x", "renderer": "x", "caption": "", "summary": "",
+            "nonColorEncoding": "", "width": 1, "height": 1, "layers": [], "references": [],
+            "tableColumns": [], "tableRows": [], "supportingTables": [] },
+        "trust": { "state": "ok", "evidence": "", "observationCount": observations.len(), "snapshotCount": 0 },
+        "provenance": { "owner": "custd", "generatedAt": "2026-11-18T00:00:00Z", "latestEngine": null,
+            "latestInputHash": null }
+    })
 }
 
 /// The chance by the deadline rises with the number of measurements, so a test can see it move.
@@ -338,6 +461,18 @@ fn write_answer(stream: &mut impl Write, status: u16, etag: Option<&str>, body: 
         head.push_str(&format!("ETag: {etag}\r\n"));
     }
     let _ = stream.write_all(format!("{head}\r\n{body}").as_bytes());
+}
+
+/// Saves a signed-in session for `base` in the store at `dir`, as `login` would.
+pub fn sign_in(base: &str, dir: &std::path::Path, expires_at: i64) {
+    let mut store = done_when::store::Store::load(dir).unwrap();
+    store.set_session(done_when::store::StoredSession {
+        host: base.to_owned(),
+        access_token: USER_TOKEN.to_owned(),
+        refresh_token: None,
+        expires_at,
+    });
+    store.save(dir).unwrap();
 }
 
 /// Runs the CLI in-process with `stdin` as input.

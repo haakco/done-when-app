@@ -1,5 +1,8 @@
-//! The local store: owner and share links of items made here, and the signed-in session.
-//! One JSON file in the platform config directory, readable by its owner only.
+//! The local store: owner and share links of items made or claimed here, and the signed-in
+//! session. One JSON file in the platform config directory, readable by its owner only: mode
+//! 0600 in a 0700 directory on Unix. On Windows it lives in `%APPDATA%\done-when`, whose
+//! inherited user-profile ACL already admits only that user, SYSTEM and Administrators; the CLI
+//! sets no ACL of its own, so a profile whose ACL was widened widens the store with it.
 
 use std::fmt;
 use std::fs;
@@ -11,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use crate::links::ItemKind;
 
 const STORE_FILE: &str = "store.json";
-/// Measurements kept per item for the live view's "recent" list.
-const RECENT_LIMIT: usize = 20;
+/// A session this close to expiry is treated as signed out, so no request carries a token
+/// that expires on the way.
+const SESSION_MARGIN_SECONDS: i64 = 60;
 
 /// `$XDG_CONFIG_HOME/done-when`, `~/Library/Application Support/done-when` or
 /// `%APPDATA%\done-when`.
@@ -47,14 +51,6 @@ pub struct StoredItem {
     pub owner_token: Option<String>,
     pub share_token: Option<String>,
     pub saved_at: String,
-    #[serde(default)]
-    pub recent: Vec<RecentMeasurement>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecentMeasurement {
-    pub at: String,
-    pub value: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -115,19 +111,6 @@ impl Store {
         }
     }
 
-    pub fn record_measurements(&mut self, host: &str, item_uuid: &str, rows: &[RecentMeasurement]) {
-        let Some(item) = self
-            .items
-            .iter_mut()
-            .find(|item| item.host == host && item.item_uuid == item_uuid)
-        else {
-            return;
-        };
-        item.recent.extend_from_slice(rows);
-        let excess = item.recent.len().saturating_sub(RECENT_LIMIT);
-        item.recent.drain(..excess);
-    }
-
     pub fn session(&self, host: &str) -> Option<&StoredSession> {
         self.sessions.iter().find(|session| session.host == host)
     }
@@ -168,8 +151,14 @@ fn private_file(path: &Path) -> io::Result<fs::File> {
 
 #[cfg(not(unix))]
 fn private_file(path: &Path) -> io::Result<fs::File> {
-    // Windows: the per-user %APPDATA% directory's ACL keeps the file private.
+    // Windows: the file inherits the per-user %APPDATA% directory's ACL (see the module docs).
     fs::File::create(path)
+}
+
+impl StoredSession {
+    pub fn is_live(&self, now: i64) -> bool {
+        self.expires_at > now + SESSION_MARGIN_SECONDS
+    }
 }
 
 impl fmt::Debug for StoredItem {

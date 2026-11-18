@@ -6,7 +6,7 @@ use std::io;
 pub enum CliError {
     /// The Custd API refused or could not be reached.
     Sdk(custd_sdk::Error),
-    /// The app's discovery file or share card could not be read.
+    /// A share card could not be read, or an answer made no sense.
     Fetch(String),
     /// The local store, a file or the terminal could not be read or written.
     Io(io::Error),

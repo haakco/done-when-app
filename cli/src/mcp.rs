@@ -15,7 +15,9 @@ use crate::ops::{self, CounterDraft};
 /// (per-request `_meta`, `server/discover`, cache hints) is not implemented.
 const SUPPORTED_VERSIONS: [&str; 3] = ["2025-11-25", "2025-06-18", "2025-03-26"];
 const INSTRUCTIONS: &str = "Track work as Done When counters. create_counter returns an itemUuid; \
-pass it as `item` to add_measurement and read_forecast. Owner links stay on this machine and are never returned.";
+pass it as `item` to add_measurement and read_forecast. Every item has a `kind`: a counter takes \
+measurements and has a forecast; a project takes dated estimates and has none; meetings, models and \
+dashboards are read only here. Owner links stay on this machine and are never returned.";
 
 const PARSE_ERROR: i64 = -32700;
 const INVALID_REQUEST: i64 = -32600;
@@ -137,7 +139,7 @@ pub const TOOLS: [Tool; 4] = [
     Tool {
         name: "read_forecast",
         title: "Read the forecast",
-        description: "Read a counter's status, completion interval and chance of meeting its deadline.",
+        description: "Read an item and its kind; for a counter, its status, completion interval and chance of meeting its deadline.",
         side_effect: SideEffect::ReadOnly,
         schema: || {
             object(
@@ -149,7 +151,7 @@ pub const TOOLS: [Tool; 4] = [
     Tool {
         name: "list_items",
         title: "List items",
-        description: "List the items saved on this machine with their share links.",
+        description: "List the signed-in user's items and the items saved on this machine, each with its kind.",
         side_effect: SideEffect::ReadOnly,
         schema: || object(json!({}), &[]),
     },

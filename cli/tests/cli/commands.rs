@@ -1,6 +1,8 @@
 use serde_json::Value;
 
-use crate::support::{FakeApi, run, temp_config_dir};
+use crate::support::{FakeApi, USER_TOKEN, run, sign_in, temp_config_dir};
+
+const NEVER: i64 = 4_102_444_800;
 
 #[test]
 fn counter_journey_keeps_the_owner_link_private() {
@@ -233,5 +235,112 @@ fn a_failed_forecast_says_the_measurement_was_stored() {
     assert!(
         err.contains("1 measurement(s) were stored") && err.contains("do not add them again"),
         "{err}"
+    );
+}
+
+#[test]
+fn a_signed_in_user_lists_claims_and_reaches_their_items() {
+    let api = FakeApi::start();
+    let dir = temp_config_dir();
+    let base = api.base_url.as_str();
+    let (code, _, err) = run(base, &dir, &["claim", "own-0"], "");
+    assert_eq!((code, err.contains("sign in first")), (1, true), "{err}");
+
+    api.add_project("Launch", Some(USER_TOKEN));
+    sign_in(base, &dir, NEVER);
+    run(
+        base,
+        &dir,
+        &["new", "counter", "--name", "Pages", "--target", "100"],
+        "",
+    );
+    let create = api
+        .requests()
+        .into_iter()
+        .find(|r| r.method == "POST" && r.target == "/api/v1/app/items")
+        .unwrap();
+    assert_eq!(create.header("x-custd-user-token"), Some(USER_TOKEN));
+
+    let (code, out, err) = run(base, &dir, &["list", "--json"], "");
+    assert_eq!(code, 0, "{err}");
+    let listed: Value = serde_json::from_str(&out).unwrap();
+    let items = listed["items"].as_array().unwrap();
+    assert_eq!(items.len(), 2, "{out}");
+    assert_eq!(
+        (&items[0]["name"], &items[0]["mine"], &items[0]["savedHere"]),
+        (
+            &Value::from("Pages"),
+            &Value::from(true),
+            &Value::from(true)
+        )
+    );
+    assert_eq!(
+        (&items[1]["name"], &items[1]["kind"], &items[1]["savedHere"]),
+        (&Value::from("Launch"), &Value::Null, &Value::from(false))
+    );
+
+    let (code, out, err) = run(base, &dir, &["show", "Launch", "--json"], "");
+    assert_eq!(code, 0, "{err}");
+    let shown: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(
+        (&shown["kind"], &shown["access"]),
+        (&"project".into(), &"owner".into())
+    );
+    let read = api
+        .requests()
+        .into_iter()
+        .rfind(|r| r.target.starts_with("/api/v1/app/item?"))
+        .unwrap();
+    assert_eq!(
+        (read.target.as_str(), read.header("authorization")),
+        ("/api/v1/app/item?item=item-0", None)
+    );
+
+    api.add_project("Shared", None);
+    let (code, out, err) = run(
+        base,
+        &dir,
+        &["claim", &format!("{base}/edit/c/own-2"), "--json"],
+        "",
+    );
+    assert_eq!(code, 0, "{err}");
+    let claimed: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(
+        (&claimed["kind"], &claimed["ownership"]),
+        (&"project".into(), &"yours".into()),
+        "the series code wins over the /c/ path"
+    );
+    let (_, out, _) = run(base, &dir, &["list", "--json"], "");
+    assert!(
+        out.contains("\"Shared\"") && !out.contains("own-2"),
+        "{out}"
+    );
+
+    api.add_project("Taken", Some("someone-else"));
+    let (code, _, err) = run(base, &dir, &["claim", "own-3"], "");
+    assert_eq!((code, err.contains("someone else")), (1, true), "{err}");
+}
+
+#[test]
+fn an_expired_session_is_not_sent() {
+    let api = FakeApi::start();
+    let dir = temp_config_dir();
+    sign_in(&api.base_url, &dir, 1);
+    let (code, _, err) = run(
+        &api.base_url,
+        &dir,
+        &["new", "counter", "--name", "Laps", "--target", "10"],
+        "",
+    );
+    assert_eq!(code, 0, "{err}");
+    assert!(
+        api.requests()
+            .iter()
+            .all(|r| r.header("x-custd-user-token").is_none())
+    );
+    let (_, out, _) = run(&api.base_url, &dir, &["list", "--json"], "");
+    assert_eq!(
+        serde_json::from_str::<Value>(&out).unwrap()["signedIn"],
+        false
     );
 }

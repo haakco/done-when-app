@@ -1,5 +1,6 @@
 //! Done When page links, matching the web app's `src/lib/links.ts`: share links are
-//! `/<c|p|d>/<token>`, owner links are `/edit/<c|p|d>/<token>`.
+//! `/<c|p|m|d>/<token>`, owner links are `/edit/<c|p|m|d>/<token>`. Meetings have no page path
+//! yet, so the CLI makes no link for them.
 
 use serde::{Deserialize, Serialize};
 
@@ -8,15 +9,19 @@ use serde::{Deserialize, Serialize};
 pub enum ItemKind {
     Counter,
     Project,
+    Model,
+    Meeting,
     Dashboard,
 }
 
 impl ItemKind {
-    fn segment(self) -> &'static str {
+    fn segment(self) -> Option<&'static str> {
         match self {
-            ItemKind::Counter => "c",
-            ItemKind::Project => "p",
-            ItemKind::Dashboard => "d",
+            ItemKind::Counter => Some("c"),
+            ItemKind::Project => Some("p"),
+            ItemKind::Model => Some("m"),
+            ItemKind::Dashboard => Some("d"),
+            ItemKind::Meeting => None,
         }
     }
 
@@ -24,6 +29,7 @@ impl ItemKind {
         match segment {
             "c" => Some(ItemKind::Counter),
             "p" => Some(ItemKind::Project),
+            "m" => Some(ItemKind::Model),
             "d" => Some(ItemKind::Dashboard),
             _ => None,
         }
@@ -33,6 +39,8 @@ impl ItemKind {
         match self {
             ItemKind::Counter => "counter",
             ItemKind::Project => "project",
+            ItemKind::Model => "model",
+            ItemKind::Meeting => "meeting",
             ItemKind::Dashboard => "dashboard",
         }
     }
@@ -44,20 +52,21 @@ pub enum Access {
     Share,
 }
 
-pub fn item_url(host: &str, kind: ItemKind, access: Access, token: &str) -> String {
-    let path = format!("/{}/{token}", kind.segment());
-    match access {
+/// The page an item's link opens, or `None` for a kind with no page path.
+pub fn item_url(host: &str, kind: ItemKind, access: Access, token: &str) -> Option<String> {
+    let path = format!("/{}/{token}", kind.segment()?);
+    Some(match access {
         Access::Owner => format!("{host}/edit{path}"),
         Access::Share => format!("{host}{path}"),
-    }
+    })
 }
 
 /// The share-card image the delivery service renders for a share link (A5).
-pub fn card_url(host: &str, kind: ItemKind, share_token: &str) -> String {
-    format!(
+pub fn card_url(host: &str, kind: ItemKind, share_token: &str) -> Option<String> {
+    Some(format!(
         "{host}/.well-known/custd-card/{}/{share_token}.png",
-        kind.segment()
-    )
+        kind.segment()?
+    ))
 }
 
 /// A pasted share link, owner link or bare token. A token in the URL fragment is also read.
@@ -103,9 +112,9 @@ mod tests {
 
     #[test]
     fn reads_every_link_shape() {
-        let host = "https://done-when.apps.custd.com";
-        let owner = item_url(host, ItemKind::Counter, Access::Owner, "own_1");
-        assert_eq!(owner, "https://done-when.apps.custd.com/edit/c/own_1");
+        let host = "https://done-when.custd.dev";
+        let owner = item_url(host, ItemKind::Counter, Access::Owner, "own_1").unwrap();
+        assert_eq!(owner, "https://done-when.custd.dev/edit/c/own_1");
         let want = Some(LinkRef {
             kind: Some(ItemKind::Counter),
             token: "own_1".to_owned(),
@@ -115,5 +124,6 @@ mod tests {
         assert_eq!(parse_link("shr-2").map(|l| l.kind), Some(None));
         assert_eq!(parse_link(&format!("{host}/x/abc")), None);
         assert_eq!(parse_link("two words"), None);
+        assert_eq!(item_url(host, ItemKind::Meeting, Access::Share, "s"), None);
     }
 }

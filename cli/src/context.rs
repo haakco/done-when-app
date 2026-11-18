@@ -1,48 +1,35 @@
-//! What every command needs: the app's host, the local store directory, and the app's
-//! discovery file (`/.well-known/custd.json`), which names its API origin, Site key and sign-in.
+//! What every command needs: the app's host, the local store directory, the app's discovery
+//! file (`/.well-known/custd.json`, which names its API origin, Site key and sign-in) and the
+//! signed-in session, if any.
 
 use std::cell::OnceCell;
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use custd_sdk::{AppClient, DeviceInstructions, DeviceLogin, DeviceToken};
-use serde::Deserialize;
+use custd_sdk::{
+    AppClient, DeviceInstructions, DeviceLogin, DeviceToken, HostedAppDiscovery,
+    read_hosted_app_discovery,
+};
 
 use crate::error::{CliError, CliResult};
-use crate::store::Store;
+use crate::store::{Store, StoredSession};
+use crate::time::now_seconds;
 
-pub const DEFAULT_HOST: &str = "https://done-when.apps.custd.com";
-const DISCOVERY_PATH: &str = "/.well-known/custd.json";
+/// The production environment of the Done When app.
+pub const DEFAULT_HOST: &str = "https://done-when.custd.dev";
 const FETCH_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_CARD_BYTES: u64 = 4 << 20;
 
 /// Runs the device login; replaced in tests, because the SDK requires an HTTPS issuer.
 pub type LoginRunner = fn(&DeviceLogin, &mut dyn Write) -> custd_sdk::Result<DeviceToken>;
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Discovery {
-    pub api_base_url: String,
-    pub browser_key: String,
-    pub sign_in: Option<DiscoverySignIn>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DiscoverySignIn {
-    pub issuer: String,
-    pub client_id: String,
-    pub audience: String,
-}
-
 pub struct Context {
-    /// The app's origin, for example `https://done-when.apps.custd.com`.
+    /// The app's origin, for example `https://done-when.custd.dev`.
     pub host: String,
     pub config_dir: PathBuf,
     pub login_runner: LoginRunner,
-    discovery: OnceCell<Discovery>,
-    app: OnceCell<AppClient>,
+    discovery: OnceCell<HostedAppDiscovery>,
 }
 
 impl Context {
@@ -52,7 +39,6 @@ impl Context {
             config_dir,
             login_runner: device_login,
             discovery: OnceCell::new(),
-            app: OnceCell::new(),
         }
     }
 
@@ -71,24 +57,32 @@ impl Context {
         CliError::Io(std::io::Error::new(error.kind(), message))
     }
 
-    pub fn discovery(&self) -> CliResult<&Discovery> {
+    pub fn discovery(&self) -> CliResult<&HostedAppDiscovery> {
         if let Some(discovery) = self.discovery.get() {
             return Ok(discovery);
         }
-        let body = fetch(&format!("{}{DISCOVERY_PATH}", self.host), 1 << 20)?;
-        let discovery: Discovery = serde_json::from_slice(&body)
-            .map_err(|e| CliError::Fetch(format!("{} discovery file: {e}", self.host)))?;
+        let discovery = read_hosted_app_discovery(&self.host)?;
         Ok(self.discovery.get_or_init(|| discovery))
     }
 
-    /// The SDK's app client: the discovery file's API origin and Site key, with this host as Origin.
-    pub fn app(&self) -> CliResult<&AppClient> {
-        if let Some(app) = self.app.get() {
-            return Ok(app);
-        }
-        let discovery = self.discovery()?;
-        let app = AppClient::new(&discovery.api_base_url, &discovery.browser_key, &self.host);
-        Ok(self.app.get_or_init(|| app))
+    /// The signed-in session for this host, while it is still valid.
+    pub fn session(&self) -> CliResult<Option<StoredSession>> {
+        let store = self.load_store()?;
+        Ok(store
+            .session(&self.host)
+            .filter(|session| session.is_live(now_seconds()))
+            .cloned())
+    }
+
+    /// The SDK's app client, with the signed-in user's token while the session is valid. It is
+    /// built per call, so a session that expires during `watch` or `mcp` stops being sent: the
+    /// API refuses a request whose user token it cannot verify, even beside a valid link.
+    pub fn app(&self) -> CliResult<AppClient> {
+        let app = AppClient::from_discovery(self.discovery()?, &self.host);
+        Ok(match self.session()? {
+            Some(session) => app.with_user_token(session.access_token),
+            None => app,
+        })
     }
 }
 
@@ -106,8 +100,8 @@ fn device_login(login: &DeviceLogin, out: &mut dyn Write) -> custd_sdk::Result<D
     })
 }
 
-/// One GET of a public file the app's host serves: the discovery file or a share-card PNG.
-pub fn fetch(url: &str, limit: u64) -> CliResult<Vec<u8>> {
+/// One GET of a share-card PNG the app's host serves.
+pub fn fetch_card(url: &str) -> CliResult<Vec<u8>> {
     let config = ureq::Agent::config_builder()
         .max_redirects(0)
         .timeout_global(Some(FETCH_TIMEOUT))
@@ -121,11 +115,7 @@ pub fn fetch(url: &str, limit: u64) -> CliResult<Vec<u8>> {
     response
         .body_mut()
         .with_config()
-        .limit(limit)
+        .limit(MAX_CARD_BYTES)
         .read_to_vec()
         .map_err(|e| CliError::Fetch(format!("GET {url}: {e}")))
-}
-
-pub fn fetch_card(url: &str) -> CliResult<Vec<u8>> {
-    fetch(url, MAX_CARD_BYTES)
 }

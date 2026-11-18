@@ -2,6 +2,7 @@ use std::io::Cursor;
 use std::time::Duration;
 
 use done_when::context::Context;
+use done_when::ops::{Reach, Resolved};
 use done_when::watch::{Poller, WatchModel, card_protocol, render};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -50,20 +51,26 @@ fn watch_polls_conditionally_and_renders_with_and_without_an_image() {
         card_url: Some(format!("{}/card.png", api.base_url)),
         ..WatchModel::default()
     };
+    let item = Resolved {
+        reach: Reach::Link("own-0".to_owned()),
+        stored: None,
+    };
     let mut poller = Poller::new(Duration::from_secs(5));
-    poller.poll(&ctx, "own-0", &mut model);
-    poller.poll(&ctx, "own-0", &mut model);
+    poller.poll(&ctx, &item, &mut model);
+    poller.poll(&ctx, &item, &mut model);
     assert!(model.status.starts_with("Updated"), "{}", model.status);
-    let reads: Vec<_> = api
-        .requests()
-        .into_iter()
-        .filter(|r| r.target == "/api/v1/app/item")
-        .collect();
-    assert!(
-        reads.last().unwrap().header("if-none-match").is_some(),
-        "second poll is conditional"
-    );
-    assert_eq!(model.recent.len(), 2);
+    for path in ["/api/v1/app/item", "/api/v1/app/forecast/story"] {
+        let last = api
+            .requests()
+            .into_iter()
+            .rfind(|r| r.target == path)
+            .unwrap();
+        assert!(
+            last.header("if-none-match").is_some(),
+            "second poll of {path} is conditional"
+        );
+    }
+    assert_eq!(model.measurements.len(), 2, "history comes from the story");
 
     let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     terminal.draw(|frame| render(frame, &model, None)).unwrap();
@@ -73,7 +80,7 @@ fn watch_polls_conditionally_and_renders_with_and_without_an_image() {
         "Forecast",
         "50% by 2026-12-01",
         "cannot show images",
-        "Added from here",
+        "Measurements",
         "40",
     ] {
         assert!(text.contains(want), "missing {want:?} in\n{text}");

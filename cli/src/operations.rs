@@ -15,9 +15,40 @@ use Coverage::{Command, Deferred};
 const TENANT_ADMIN: Coverage = Deferred(
     "tenant admin route behind an admin credential; Done When users act through the app item routes",
 );
+const MEETING_STEP: Coverage =
+    Deferred("meetings are read-only here (show, list); the web meeting page runs them live");
+const ALERTS: Coverage = Deferred("alerts are set up on the web owner page");
 
 pub const OPERATIONS: &[(&str, Coverage)] = &[
     ("DeviceLogin::run", Command("login")),
+    (
+        "device_user_code_groups",
+        Command("login (the code prompt)"),
+    ),
+    (
+        "read_hosted_app_discovery",
+        Command("every command that calls the API, once per run"),
+    ),
+    (
+        "AppClient::list_my_items",
+        Command("list, mcp list_items, and name or UUID lookup while signed in"),
+    ),
+    ("AppLink::claim", Command("claim")),
+    (
+        "AppLink::forecast_story",
+        Command("watch (measurement history)"),
+    ),
+    ("AppLink::start_meeting", MEETING_STEP),
+    ("AppLink::advance_meeting", MEETING_STEP),
+    ("AppLink::end_meeting", MEETING_STEP),
+    ("AppLink::alert_settings", ALERTS),
+    ("AppLink::alert_deliveries", ALERTS),
+    ("AppLink::add_alert_rule", ALERTS),
+    ("AppLink::remove_alert_rule", ALERTS),
+    ("AppLink::add_alert_webhook", ALERTS),
+    ("AppLink::remove_alert_webhook", ALERTS),
+    ("AppLink::subscribe_alert_email", ALERTS),
+    ("AppLink::unsubscribe_alert_email", ALERTS),
     (
         "AppClient::create_item",
         Command("new counter, dashboard create, mcp create_counter"),
@@ -83,5 +114,13 @@ pub const OPERATIONS: &[(&str, Coverage)] = &[
     ("CustdClient::get_measurement_forecast_run", TENANT_ADMIN),
 ];
 
-/// Public SDK functions that build clients rather than call the API.
-pub const NOT_OPERATIONS: &[&str] = &["AppClient::new", "AppClient::link", "CustdClient::new"];
+/// Public SDK functions that build clients rather than call the API. `with_user_token` is
+/// applied to every app client while a session is valid; `owned_item` reaches "my items".
+pub const NOT_OPERATIONS: &[&str] = &[
+    "AppClient::new",
+    "AppClient::from_discovery",
+    "AppClient::with_user_token",
+    "AppClient::link",
+    "AppClient::owned_item",
+    "CustdClient::new",
+];

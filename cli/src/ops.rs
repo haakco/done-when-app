@@ -3,22 +3,27 @@
 //! link never sends a write.
 
 use custd_sdk::{
-    APP_ITEM_KIND_LINK_COLLECTION, APP_ITEM_KIND_MEASUREMENT_PROJECT, ApiError, AppItemCreate,
-    AppItemRead, AppMeasurementProjectCreate, AppReadOptions, Conditional, DeviceLogin, Error,
-    MeasurementForecastRun, MeasurementForecastRunRequest, MeasurementObservation,
-    MeasurementObservationBulk, MeasurementSeriesCreate, MeasurementTargetCreate, ProjectComplete,
-    ProjectEstimateCreate,
+    APP_ITEM_KIND_LINK_COLLECTION, APP_ITEM_KIND_MEASUREMENT_PROJECT, APP_ITEM_KIND_MEETING,
+    ApiError, AppClient, AppItemCreate, AppItemRead, AppLink, AppMeasurementProjectCreate,
+    AppMeeting, AppReadOptions, Conditional, DeviceLogin, Error, MeasurementForecastRun,
+    MeasurementForecastRunRequest, MeasurementObservation, MeasurementObservationBulk,
+    MeasurementSeriesCreate, MeasurementTargetCreate, ProjectComplete, ProjectEstimateCreate,
 };
 use serde::Serialize;
 
 use crate::context::Context;
 use crate::error::{CliError, CliResult};
 use crate::links::{Access, ItemKind, card_url, item_url, parse_link};
-use crate::store::{RecentMeasurement, StoredItem, StoredSession};
+use crate::store::{StoredItem, StoredSession};
 use crate::time::{now_rfc3339, now_seconds, parse_rfc3339};
 
 const COUNTER_PROJECT_KIND: &str = "deadline_forecast";
-const SERIES_CODE: &str = "value";
+/// The first series' code tells the item kinds apart, as in the web app's `itemKindOf`.
+pub const COUNTER_SERIES_CODE: &str = "value";
+pub const PROJECT_SERIES_CODE: &str = "estimate";
+/// The SDK has no constant for model items yet; the web app's SDK names it `uncertainty_model`.
+const APP_ITEM_KIND_MODEL: &str = "uncertainty_model";
+const CLAIMED_BY_SOMEONE_ELSE: &str = "app_item_claimed";
 const COMPLETION_INCREASE: &str = "increase";
 const SOURCE_MANUAL: &str = "manual";
 const TARGET_CODE: &str = "done";
@@ -26,15 +31,40 @@ const TARGET_ACTIVE: &str = "active";
 /// Custd's unit slugs are a closed lookup table, so a counter's free-text unit is its series name.
 const UNIT_SLUG: &str = "unitless";
 const ROLE_OWNER: &str = "owner";
+const ROLE_SHARE: &str = "share";
 const SIGN_IN_SCOPES: [&str; 3] = ["openid", "profile", "offline_access"];
 
-/// An item reference resolved to a token, with what is saved locally about it.
+/// How the item routes reach an item: with a link token, or as the signed-in owner by UUID.
+#[derive(Debug, Clone)]
+pub enum Reach {
+    Link(String),
+    Owned(String),
+}
+
+/// An item reference resolved to how it is reached, with what is saved locally about it.
 pub struct Resolved {
-    pub token: String,
-    pub kind: Option<ItemKind>,
+    pub reach: Reach,
     pub stored: Option<StoredItem>,
 }
 
+impl Resolved {
+    pub fn link<'a>(&self, app: &'a AppClient) -> AppLink<'a> {
+        match &self.reach {
+            Reach::Link(token) => app.link(token.clone()),
+            Reach::Owned(item_uuid) => app.owned_item(item_uuid.clone()),
+        }
+    }
+
+    pub fn token(&self) -> Option<&str> {
+        match &self.reach {
+            Reach::Link(token) => Some(token),
+            Reach::Owned(_) => None,
+        }
+    }
+}
+
+/// A saved item by name or UUID, then (signed in) one of "my items" by name or UUID, then a
+/// pasted link or token.
 pub fn resolve(ctx: &Context, reference: &str) -> CliResult<Resolved> {
     let store = ctx.load_store()?;
     if let Some(stored) = store.find(&ctx.host, reference) {
@@ -43,23 +73,34 @@ pub fn resolve(ctx: &Context, reference: &str) -> CliResult<Resolved> {
             .clone()
             .or_else(|| stored.share_token.clone());
         return Ok(Resolved {
-            token: token.ok_or(CliError::UnknownItem)?,
-            kind: Some(stored.kind),
+            reach: token.map_or_else(|| Reach::Owned(stored.item_uuid.clone()), Reach::Link),
             stored: Some(stored.clone()),
         });
     }
+    if !reference.contains("://") && ctx.session()?.is_some() {
+        let mine = ctx.app()?.list_my_items()?;
+        let found = mine
+            .items
+            .iter()
+            .find(|summary| summary.item.item_uuid == reference || summary.name == reference);
+        if let Some(summary) = found {
+            return Ok(Resolved {
+                reach: Reach::Owned(summary.item.item_uuid.clone()),
+                stored: None,
+            });
+        }
+    }
     let link = parse_link(reference).ok_or(CliError::UnknownItem)?;
-    let stored = store.find_by_token(&ctx.host, &link.token).cloned();
     Ok(Resolved {
-        kind: link.kind.or(stored.as_ref().map(|item| item.kind)),
-        token: link.token,
-        stored,
+        stored: store.find_by_token(&ctx.host, &link.token).cloned(),
+        reach: Reach::Link(link.token),
     })
 }
 
-/// Reads an item with any link.
-pub fn read_item(ctx: &Context, token: &str) -> CliResult<AppItemRead> {
-    match ctx.app()?.link(token).read(&AppReadOptions::default())? {
+/// Reads an item with any link, or as its signed-in owner.
+pub fn read_item(ctx: &Context, resolved: &Resolved) -> CliResult<AppItemRead> {
+    let app = ctx.app()?;
+    match resolved.link(&app).read(&AppReadOptions::default())? {
         Conditional::Modified { value, .. } => Ok(value),
         Conditional::NotModified => Err(CliError::Fetch(
             "unexpected 304 without If-None-Match".to_owned(),
@@ -67,39 +108,52 @@ pub fn read_item(ctx: &Context, token: &str) -> CliResult<AppItemRead> {
     }
 }
 
-/// Reads an item and refuses unless the link is its owner link.
+/// Reads an item and refuses unless the caller may change it.
 fn read_owned(ctx: &Context, reference: &str) -> CliResult<(Resolved, AppItemRead)> {
     let resolved = resolve(ctx, reference)?;
-    let read = read_item(ctx, &resolved.token)?;
+    let read = read_item(ctx, &resolved)?;
     if read.item.role != ROLE_OWNER {
         return Err(CliError::ReadOnly);
     }
     Ok((resolved, read))
 }
 
-pub fn item_kind(read: &AppItemRead, hint: Option<ItemKind>) -> ItemKind {
-    if read.item.kind == APP_ITEM_KIND_LINK_COLLECTION {
-        return ItemKind::Dashboard;
+/// The kind an item's `kind` names on its own; a measurement project needs its series code.
+pub fn kind_of_item_kind(kind: &str) -> Option<ItemKind> {
+    match kind {
+        APP_ITEM_KIND_LINK_COLLECTION => Some(ItemKind::Dashboard),
+        APP_ITEM_KIND_MEETING => Some(ItemKind::Meeting),
+        APP_ITEM_KIND_MODEL => Some(ItemKind::Model),
+        _ => None,
     }
-    if let Some(hint) = hint {
-        return hint;
+}
+
+/// The item's kind from the read itself, never from the link's path: a project's first series
+/// is `estimate`, a counter's is `value`.
+pub fn item_kind(read: &AppItemRead) -> ItemKind {
+    if let Some(kind) = kind_of_item_kind(&read.item.kind) {
+        return kind;
     }
-    let has_series = read
+    let series_code = read
         .measurement_project
         .as_ref()
-        .is_some_and(|project| !project.series.is_empty());
-    if has_series {
-        ItemKind::Counter
-    } else {
+        .and_then(|project| project.series.first())
+        .map(|series| series.series_code.as_str());
+    if series_code == Some(PROJECT_SERIES_CODE) {
         ItemKind::Project
+    } else {
+        ItemKind::Counter
     }
 }
 
 /// The latest forecast, or `None` when the item has none yet.
-pub fn latest_forecast(ctx: &Context, token: &str) -> CliResult<Option<MeasurementForecastRun>> {
-    match ctx
-        .app()?
-        .link(token)
+pub fn latest_forecast(
+    ctx: &Context,
+    resolved: &Resolved,
+) -> CliResult<Option<MeasurementForecastRun>> {
+    let app = ctx.app()?;
+    match resolved
+        .link(&app)
         .latest_forecast(&AppReadOptions::default())
     {
         Ok(Conditional::Modified { value, .. }) => Ok(Some(value)),
@@ -178,7 +232,7 @@ pub struct CreatedReport {
     pub item_uuid: String,
     pub kind: ItemKind,
     pub name: String,
-    pub share_url: String,
+    pub share_url: Option<String>,
     /// The owner link is saved locally under this name; print it with `share --owner`.
     pub owner_link_saved: bool,
     pub start_measurement_added: bool,
@@ -210,6 +264,48 @@ pub struct ItemReport {
     pub estimates: Vec<EstimateReport>,
     pub entries: Vec<EntryReport>,
     pub forecast: Option<ForecastSummary>,
+    pub meeting: Option<MeetingReport>,
+}
+
+/// A meeting as it runs; the CLI only reads meetings.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeetingReport {
+    pub status: String,
+    pub started_at: Option<String>,
+    pub ends_at: Option<String>,
+    pub overrun_ms: i64,
+    pub blocks: Vec<MeetingBlockReport>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeetingBlockReport {
+    pub title: String,
+    pub status: String,
+    pub predicted_ms: i64,
+    pub actual_ms: i64,
+}
+
+impl MeetingReport {
+    fn from_meeting(meeting: &AppMeeting) -> Self {
+        Self {
+            status: meeting.status.clone(),
+            started_at: meeting.started_at.clone(),
+            ends_at: meeting.ends_at.clone(),
+            overrun_ms: meeting.summary.overrun_ms,
+            blocks: meeting
+                .blocks
+                .iter()
+                .map(|block| MeetingBlockReport {
+                    title: block.title.clone(),
+                    status: block.status.clone(),
+                    predicted_ms: block.predicted_ms,
+                    actual_ms: block.actual_ms,
+                })
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -232,9 +328,8 @@ pub struct EntryReport {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListReport {
+    /// When signed in, the list holds "my items" as well as the items saved here.
     pub signed_in: bool,
-    /// Where the list came from. Only `local` today: the SDK has no "my items" read yet.
-    pub source: String,
     pub items: Vec<ListedItem>,
 }
 
@@ -242,11 +337,16 @@ pub struct ListReport {
 #[serde(rename_all = "camelCase")]
 pub struct ListedItem {
     pub item_uuid: String,
-    pub kind: ItemKind,
+    /// `None` for one of "my items" not saved here that is a counter or a project: the list
+    /// does not say which.
+    pub kind: Option<ItemKind>,
     pub name: String,
     pub access: String,
+    /// The signed-in user owns it.
+    pub mine: bool,
+    /// Its links are saved on this machine.
+    pub saved_here: bool,
     pub share_url: Option<String>,
-    pub saved_at: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -263,6 +363,16 @@ pub struct ShareReport {
 pub struct StatusReport {
     pub item_uuid: String,
     pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimReport {
+    pub item_uuid: String,
+    pub kind: ItemKind,
+    pub name: String,
+    /// `yours` once claimed.
+    pub ownership: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -292,8 +402,8 @@ pub fn create_counter(ctx: &Context, draft: &CounterDraft) -> CliResult<CreatedR
     }
     let request = AppItemCreate {
         kind: APP_ITEM_KIND_MEASUREMENT_PROJECT.to_owned(),
-        idle_expiry_seconds: None,
         measurement_project: Some(counter_project(draft, deadline)),
+        ..AppItemCreate::default()
     };
     let created = ctx.app()?.create_item(&request)?;
     let item_uuid = created.item.item.item_uuid.clone();
@@ -303,7 +413,7 @@ pub fn create_counter(ctx: &Context, draft: &CounterDraft) -> CliResult<CreatedR
         ItemKind::Counter,
         &draft.name,
         Some(&created.owner_token),
-        &created.share_token,
+        Some(&created.share_token),
     )?;
     let mut report = CreatedReport {
         item_uuid: item_uuid.clone(),
@@ -320,13 +430,11 @@ pub fn create_counter(ctx: &Context, draft: &CounterDraft) -> CliResult<CreatedR
     };
     if let Some(start) = draft.start {
         let at = started_at.unwrap_or_else(now_rfc3339);
-        add_rows(
-            ctx,
-            &item_uuid,
-            &created.owner_token,
-            &created.item,
-            &[(at, start)],
-        )?;
+        let owner = Resolved {
+            reach: Reach::Link(created.owner_token.clone()),
+            stored: None,
+        };
+        add_rows(ctx, &owner, &created.item, &[(at, start)])?;
         report.start_measurement_added = true;
     }
     Ok(report)
@@ -338,7 +446,7 @@ fn counter_project(draft: &CounterDraft, deadline: Option<String>) -> AppMeasure
         name: draft.name.clone(),
         description: None,
         series: vec![MeasurementSeriesCreate {
-            series_code: SERIES_CODE.to_owned(),
+            series_code: COUNTER_SERIES_CODE.to_owned(),
             name: draft.unit.clone().unwrap_or_else(|| draft.name.clone()),
             unit_slug: UNIT_SLUG.to_owned(),
             completion_direction: COMPLETION_INCREASE.to_owned(),
@@ -360,7 +468,7 @@ fn save_item(
     kind: ItemKind,
     name: &str,
     owner_token: Option<&str>,
-    share_token: &str,
+    share_token: Option<&str>,
 ) -> CliResult<()> {
     let mut store = ctx.load_store()?;
     store.upsert(StoredItem {
@@ -369,9 +477,8 @@ fn save_item(
         kind,
         name: name.to_owned(),
         owner_token: owner_token.map(str::to_owned),
-        share_token: Some(share_token.to_owned()),
+        share_token: share_token.map(str::to_owned),
         saved_at: now_rfc3339(),
-        recent: Vec::new(),
     });
     ctx.save_store(&store)
 }
@@ -386,18 +493,17 @@ pub fn add_measurements(
         return Err(CliError::Usage("no measurements to add".to_owned()));
     }
     let (resolved, read) = read_owned(ctx, reference)?;
-    if item_kind(&read, resolved.kind) != ItemKind::Counter {
+    if item_kind(&read) != ItemKind::Counter {
         return Err(CliError::WrongKind(
-            "measurements go on a counter".to_owned(),
+            "measurements go on a counter; a project takes estimates".to_owned(),
         ));
     }
-    add_rows(ctx, &read.item.item_uuid, &resolved.token, &read, rows)
+    add_rows(ctx, &resolved, &read, rows)
 }
 
 fn add_rows(
     ctx: &Context,
-    item_uuid: &str,
-    owner_token: &str,
+    owner: &Resolved,
     read: &AppItemRead,
     rows: &[(String, f64)],
 ) -> CliResult<AddReport> {
@@ -418,21 +524,9 @@ fn add_rows(
             })
             .collect(),
     };
-    let link = ctx.app()?.link(owner_token);
+    let app = ctx.app()?;
+    let link = owner.link(&app);
     let import = link.add_measurements(&request)?;
-    let accepted: Vec<RecentMeasurement> = import
-        .results
-        .iter()
-        .filter(|result| result.success)
-        .filter_map(|result| rows.get(result.row_index as usize))
-        .map(|(at, value)| RecentMeasurement {
-            at: at.clone(),
-            value: *value,
-        })
-        .collect();
-    let mut store = ctx.load_store()?;
-    store.record_measurements(&ctx.host, item_uuid, &accepted);
-    ctx.save_store(&store)?;
     let run = link
         .run_forecast(&MeasurementForecastRunRequest::default())
         .map_err(|error| CliError::ForecastAfterWrite {
@@ -440,7 +534,7 @@ fn add_rows(
             error,
         })?;
     Ok(AddReport {
-        item_uuid: item_uuid.to_owned(),
+        item_uuid: read.item.item_uuid.clone(),
         accepted: import.accepted,
         rejected: import.rejected,
         target_reached: import.completed_target_uuid.is_some(),
@@ -500,11 +594,11 @@ pub fn timestamp(text: &str) -> CliResult<String> {
 
 pub fn show(ctx: &Context, reference: &str) -> CliResult<ItemReport> {
     let resolved = resolve(ctx, reference)?;
-    let read = read_item(ctx, &resolved.token)?;
-    let kind = item_kind(&read, resolved.kind);
+    let read = read_item(ctx, &resolved)?;
+    let kind = item_kind(&read);
     let forecast = match kind {
         ItemKind::Counter => {
-            latest_forecast(ctx, &resolved.token)?.map(|run| ForecastSummary::from_run(&run))
+            latest_forecast(ctx, &resolved)?.map(|run| ForecastSummary::from_run(&run))
         }
         _ => None,
     };
@@ -525,8 +619,10 @@ pub fn item_report(
 ) -> ItemReport {
     let project = read.measurement_project.as_ref();
     let target = project.and_then(|p| p.target.as_ref());
+    let meeting = read.meeting.as_ref();
     let name = project
         .map(|p| p.name.clone())
+        .or_else(|| meeting.map(|m| m.name.clone()))
         .or_else(|| stored.map(|s| s.name.clone()))
         .unwrap_or_else(|| kind.label().to_owned());
     ItemReport {
@@ -534,7 +630,10 @@ pub fn item_report(
         kind,
         name,
         access: read.item.role.clone(),
-        status: project.map_or_else(|| "active".to_owned(), |p| p.status.clone()),
+        status: project
+            .map(|p| p.status.clone())
+            .or_else(|| meeting.map(|m| m.status.clone()))
+            .unwrap_or_else(|| "active".to_owned()),
         target_value: target.map(|t| t.target_value),
         unit: project.and_then(unit_label),
         deadline: target
@@ -563,37 +662,96 @@ pub fn item_report(
             })
             .collect(),
         forecast,
+        meeting: meeting.map(MeetingReport::from_meeting),
     }
 }
 
-/// Items saved on this machine. Signed-in "my items" needs `listAppItems` in the SDK.
+/// The items saved on this machine and, when signed in, "my items" (one call).
 pub fn list(ctx: &Context) -> CliResult<ListReport> {
     let store = ctx.load_store()?;
-    let items = store
+    let mut items: Vec<ListedItem> = store
         .items_on(&ctx.host)
         .map(|item| ListedItem {
             item_uuid: item.item_uuid.clone(),
-            kind: item.kind,
+            kind: Some(item.kind),
             name: item.name.clone(),
             access: if item.owner_token.is_some() {
-                "owner"
+                ROLE_OWNER
             } else {
-                "share"
+                ROLE_SHARE
             }
             .to_owned(),
+            mine: false,
+            saved_here: true,
             share_url: item
                 .share_token
                 .as_deref()
-                .map(|token| item_url(&ctx.host, item.kind, Access::Share, token)),
-            saved_at: item.saved_at.clone(),
+                .and_then(|token| item_url(&ctx.host, item.kind, Access::Share, token)),
         })
         .collect();
-    Ok(ListReport {
-        signed_in: store
-            .session(&ctx.host)
-            .is_some_and(|s| s.expires_at > now_seconds()),
-        source: "local".to_owned(),
-        items,
+    let signed_in = ctx.session()?.is_some();
+    if signed_in {
+        for summary in ctx.app()?.list_my_items()?.items {
+            let uuid = &summary.item.item_uuid;
+            if let Some(known) = items.iter_mut().find(|item| &item.item_uuid == uuid) {
+                known.mine = true;
+                known.access = ROLE_OWNER.to_owned();
+                continue;
+            }
+            let kind = kind_of_item_kind(&summary.item.kind);
+            items.push(ListedItem {
+                item_uuid: uuid.clone(),
+                kind,
+                name: match summary.name.as_str() {
+                    "" => kind.map_or("item", ItemKind::label).to_owned(),
+                    name => name.to_owned(),
+                },
+                access: summary.item.role.clone(),
+                mine: true,
+                saved_here: false,
+                share_url: None,
+            });
+        }
+    }
+    Ok(ListReport { signed_in, items })
+}
+
+/// Makes the signed-in user the owner of the item an owner link opens, and saves it here.
+pub fn claim(ctx: &Context, reference: &str) -> CliResult<ClaimReport> {
+    if ctx.session()?.is_none() {
+        return Err(CliError::Usage(
+            "sign in first with `done-when login`; claiming makes the item yours".to_owned(),
+        ));
+    }
+    let (resolved, _) = read_owned(ctx, reference)?;
+    let Some(owner_token) = resolved.token() else {
+        return Err(CliError::Usage("that item is already yours".to_owned()));
+    };
+    let app = ctx.app()?;
+    let read = match resolved.link(&app).claim() {
+        Err(Error::Api(error)) if error.code() == Some(CLAIMED_BY_SOMEONE_ELSE) => {
+            return Err(CliError::Usage(
+                "someone else has already claimed that item".to_owned(),
+            ));
+        }
+        other => other?,
+    };
+    let kind = item_kind(&read);
+    let report = item_report(&read, kind, resolved.stored.as_ref(), None);
+    let share_token = resolved.stored.as_ref().and_then(|s| s.share_token.clone());
+    save_item(
+        ctx,
+        &report.item_uuid,
+        kind,
+        &report.name,
+        Some(owner_token),
+        share_token.as_deref(),
+    )?;
+    Ok(ClaimReport {
+        item_uuid: report.item_uuid,
+        kind,
+        name: report.name,
+        ownership: read.item.ownership,
     })
 }
 
@@ -606,22 +764,28 @@ pub fn share(ctx: &Context, reference: &str, with_owner: bool) -> CliResult<Shar
             item.owner_token.clone(),
         ),
         None => {
-            let read = read_item(ctx, &resolved.token)?;
-            let kind = item_kind(&read, resolved.kind);
+            let read = read_item(ctx, &resolved)?;
+            let kind = item_kind(&read);
+            let token = resolved.token().map(str::to_owned);
             match read.item.role.as_str() {
-                ROLE_OWNER => (kind, None, Some(resolved.token.clone())),
-                _ => (kind, Some(resolved.token.clone()), None),
+                ROLE_OWNER => (kind, None, token),
+                _ => (kind, token, None),
             }
         }
     };
     if with_owner && owner_token.is_none() {
-        return Err(CliError::ReadOnly);
+        return Err(match resolved.reach {
+            Reach::Owned(_) => CliError::Usage(
+                "no owner link for that item is saved here; it is yours, so commands reach it without one".to_owned(),
+            ),
+            Reach::Link(_) => CliError::ReadOnly,
+        });
     }
     Ok(ShareReport {
-        share_url: share_token.map(|t| item_url(&ctx.host, kind, Access::Share, &t)),
+        share_url: share_token.and_then(|t| item_url(&ctx.host, kind, Access::Share, &t)),
         owner_url: owner_token
             .filter(|_| with_owner)
-            .map(|t| item_url(&ctx.host, kind, Access::Owner, &t)),
+            .and_then(|t| item_url(&ctx.host, kind, Access::Owner, &t)),
     })
 }
 
@@ -629,10 +793,10 @@ pub fn share(ctx: &Context, reference: &str, with_owner: bool) -> CliResult<Shar
 pub fn card_link(ctx: &Context, resolved: &Resolved, kind: ItemKind, role: &str) -> Option<String> {
     let share = match &resolved.stored {
         Some(item) => item.share_token.clone(),
-        None if role != ROLE_OWNER => Some(resolved.token.clone()),
+        None if role != ROLE_OWNER => resolved.token().map(str::to_owned),
         None => None,
     };
-    share.map(|token| card_url(&ctx.host, kind, &token))
+    share.and_then(|token| card_url(&ctx.host, kind, &token))
 }
 
 // ---- Projects ----
@@ -651,7 +815,8 @@ pub fn estimate(
         high_date: timestamp(high)?,
         note,
     };
-    let estimate = ctx.app()?.link(&resolved.token).create_estimate(&request)?;
+    let app = ctx.app()?;
+    let estimate = resolved.link(&app).create_estimate(&request)?;
     Ok(EstimateReport {
         estimated_at: estimate.estimated_at,
         low_date: estimate.low_date,
@@ -662,15 +827,17 @@ pub fn estimate(
 
 pub fn complete(ctx: &Context, reference: &str, at: Option<&str>) -> CliResult<StatusReport> {
     let (resolved, read) = read_owned(ctx, reference)?;
-    if item_kind(&read, resolved.kind) == ItemKind::Dashboard {
-        return Err(CliError::WrongKind(
-            "a dashboard cannot be completed".to_owned(),
-        ));
+    let kind = item_kind(&read);
+    if !matches!(kind, ItemKind::Counter | ItemKind::Project) {
+        return Err(CliError::WrongKind(format!(
+            "a {} cannot be completed",
+            kind.label()
+        )));
     }
     let completed_at = at.map(timestamp).transpose()?.unwrap_or_else(now_rfc3339);
-    let read = ctx
-        .app()?
-        .link(&resolved.token)
+    let app = ctx.app()?;
+    let read = resolved
+        .link(&app)
         .complete(&ProjectComplete { completed_at })?;
     Ok(StatusReport {
         item_uuid: read.item.item_uuid,
@@ -685,8 +852,7 @@ pub fn complete(ctx: &Context, reference: &str, at: Option<&str>) -> CliResult<S
 pub fn create_dashboard(ctx: &Context, name: &str) -> CliResult<CreatedReport> {
     let request = AppItemCreate {
         kind: APP_ITEM_KIND_LINK_COLLECTION.to_owned(),
-        idle_expiry_seconds: None,
-        measurement_project: None,
+        ..AppItemCreate::default()
     };
     let created = ctx.app()?.create_item(&request)?;
     let item_uuid = created.item.item.item_uuid.clone();
@@ -696,7 +862,7 @@ pub fn create_dashboard(ctx: &Context, name: &str) -> CliResult<CreatedReport> {
         ItemKind::Dashboard,
         name,
         Some(&created.owner_token),
-        &created.share_token,
+        Some(&created.share_token),
     )?;
     Ok(CreatedReport {
         item_uuid,
@@ -722,8 +888,12 @@ pub fn dashboard_add(ctx: &Context, dashboard: &str, item: &str) -> CliResult<En
         .stored
         .as_ref()
         .and_then(|stored| stored.share_token.clone())
-        .unwrap_or(entry_item.token);
-    let entry = ctx.app()?.link(&board.token).add_entry(&token)?;
+        .or_else(|| entry_item.token().map(str::to_owned))
+        .ok_or_else(|| {
+            CliError::Usage("add that item by its share link; none is saved here".to_owned())
+        })?;
+    let app = ctx.app()?;
+    let entry = board.link(&app).add_entry(&token)?;
     Ok(EntryReport {
         entry_uuid: entry.entry_uuid,
         item_uuid: entry.item_uuid,
@@ -743,9 +913,8 @@ pub fn dashboard_remove(ctx: &Context, dashboard: &str, entry: &str) -> CliResul
         .ok_or_else(|| {
             CliError::Usage("that dashboard has no such entry; see `show`".to_owned())
         })?;
-    ctx.app()?
-        .link(&board.token)
-        .remove_entry(&found.entry_uuid)?;
+    let app = ctx.app()?;
+    board.link(&app).remove_entry(&found.entry_uuid)?;
     Ok(EntryReport {
         entry_uuid: found.entry_uuid.clone(),
         item_uuid: found.item_uuid.clone(),

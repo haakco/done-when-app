@@ -35,9 +35,15 @@ fn an_agent_adds_a_measurement_and_reads_the_new_forecast() {
         call(4, "add_measurement", json!({ "item": "item-0", "value": 30 })),
         call(5, "read_forecast", json!({ "item": "Tasks" })),
         call(6, "add_measurement", json!({ "item": format!("{}/c/shr-0", api.base_url), "value": 31 })),
+        call(7, "list_items", json!({})),
     ];
     let replies = serve(&api, &dir, &lines);
-    assert_eq!(replies.len(), 6, "a notification gets no reply");
+    assert_eq!(replies.len(), 7, "a notification gets no reply");
+    assert_eq!(
+        replies[6]["result"]["structuredContent"]["items"][0]["kind"],
+        "counter"
+    );
+    assert_eq!(replies[4]["result"]["structuredContent"]["kind"], "counter");
     assert_eq!(replies[0]["result"]["protocolVersion"], "2025-06-18");
 
     let tools = replies[1]["result"]["tools"].as_array().unwrap();

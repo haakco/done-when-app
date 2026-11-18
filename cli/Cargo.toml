@@ -11,7 +11,7 @@ name = "done-when"
 path = "src/main.rs"
 
 [dependencies]
-custd-sdk = { git = "https://github.com/haakco/custd-sdk", tag = "v3.49.0" }
+custd-sdk = { git = "https://github.com/haakco/custd-sdk", tag = "v3.52.0" }
 clap = { version = "4.6.8", default-features = false, features = ["std", "derive", "env", "help", "usage", "error-context"] }
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
 ratatui-image = { version = "11.1.0", default-features = false, features = ["crossterm"] }

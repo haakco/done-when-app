@@ -5,11 +5,15 @@ use std::process::Command;
 
 use done_when::operations::{NOT_OPERATIONS, OPERATIONS};
 
-const SDK_SOURCES: [&str; 4] = [
+const SDK_SOURCES: [&str; 8] = [
     "src/app.rs",
+    "src/app_alerts.rs",
+    "src/app_meetings.rs",
+    "src/app_story.rs",
     "src/client.rs",
-    "src/measurement.rs",
     "src/device.rs",
+    "src/discovery.rs",
+    "src/measurement.rs",
 ];
 
 fn sdk_root() -> PathBuf {
@@ -36,7 +40,8 @@ fn sdk_root() -> PathBuf {
         .to_owned()
 }
 
-/// `Type::method` for every `pub fn` in an inherent `impl Type` block.
+/// `Type::method` for every `pub fn` in an inherent `impl Type` block, and the bare name of
+/// every top-level `pub fn`.
 fn sdk_operations() -> Vec<String> {
     let root = sdk_root();
     let mut found = Vec::new();
@@ -47,6 +52,8 @@ fn sdk_operations() -> Vec<String> {
             if let Some(rest) = line.strip_prefix("impl ") {
                 let inherent = !rest.contains(" for ");
                 current = inherent.then(|| rest.split(['<', ' ']).next().unwrap().to_owned());
+            } else if let Some(rest) = line.strip_prefix("pub fn ") {
+                found.push(rest.split(['(', '<']).next().unwrap().to_owned());
             } else if line.starts_with('}') {
                 current = None;
             } else if let (Some(owner), Some(rest)) = (&current, line.strip_prefix("    pub fn ")) {

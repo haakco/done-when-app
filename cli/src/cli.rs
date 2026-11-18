@@ -37,10 +37,12 @@ pub enum Command {
     New(NewCommand),
     /// Add a measurement to a counter, or many from a CSV file (timestamp,value).
     Add(AddArgs),
-    /// Show an item and its forecast.
+    /// Show an item: a counter's forecast, a project's estimates, a meeting's agenda.
     Show(ItemArg),
-    /// List items saved on this machine.
+    /// List your items (when signed in) and the items saved on this machine.
     List,
+    /// Make an item yours with its owner link (sign in first).
+    Claim(ItemArg),
     /// Record a dated low/high estimate on a project.
     Estimate(EstimateArgs),
     /// Complete a project on its actual date (default now).
@@ -84,7 +86,7 @@ pub struct CounterArgs {
 
 #[derive(Debug, Args)]
 pub struct ItemArg {
-    /// A saved item's name or UUID, or a share or owner link.
+    /// A saved item's name or UUID, one of your items' name or UUID, or a share or owner link.
     pub item: String,
 }
 
@@ -184,6 +186,7 @@ pub fn dispatch(
         Command::Add(args) => print(out, json, &add(ctx, &args)?),
         Command::Show(args) => print(out, json, &ops::show(ctx, &args.item)?),
         Command::List => print(out, json, &ops::list(ctx)?),
+        Command::Claim(args) => print(out, json, &ops::claim(ctx, &args.item)?),
         Command::Estimate(args) => print(
             out,
             json,

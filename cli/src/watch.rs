@@ -1,9 +1,13 @@
-//! `watch`: a live terminal view of a counter. It polls with `If-None-Match`, so an unchanged
-//! item costs a 304; errors back off up to a minute and say so on screen.
+//! `watch`: a live terminal view of a counter: its measurement history (from the forecast
+//! story), the forecast band and the chance by the deadline. It polls with `If-None-Match`, so
+//! an unchanged item costs a 304; errors back off up to a minute and say so on screen.
 
 use std::time::{Duration, Instant};
 
-use custd_sdk::{AppItemRead, AppReadOptions, Conditional, MeasurementForecastRun};
+use custd_sdk::{
+    ApiError, AppForecastStoryObservation, AppItemRead, AppReadOptions, Conditional, Error,
+    MeasurementForecastRun,
+};
 use ratatui::Frame;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -20,8 +24,7 @@ use ratatui_image::protocol::StatefulProtocol;
 use crate::context::{Context, fetch_card};
 use crate::error::CliResult;
 use crate::links::ItemKind;
-use crate::ops::{self, ForecastSummary};
-use crate::store::RecentMeasurement;
+use crate::ops::{self, ForecastSummary, Resolved};
 use crate::time::{format_date, format_rfc3339, now_seconds, parse_rfc3339};
 
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
@@ -35,7 +38,8 @@ pub struct WatchModel {
     pub target: Option<f64>,
     pub deadline: Option<String>,
     pub forecast: Option<MeasurementForecastRun>,
-    pub recent: Vec<RecentMeasurement>,
+    /// The measurements, oldest first, as the forecast story lists them.
+    pub measurements: Vec<AppForecastStoryObservation>,
     pub status: String,
     /// The share-card URL, shown as text when the image cannot be drawn.
     pub card_url: Option<String>,
@@ -58,6 +62,7 @@ pub struct Poller {
     backoff: Option<Duration>,
     item_etag: Option<String>,
     forecast_etag: Option<String>,
+    story_etag: Option<String>,
     pub paused: bool,
     next_at: Instant,
 }
@@ -69,6 +74,7 @@ impl Poller {
             backoff: None,
             item_etag: None,
             forecast_etag: None,
+            story_etag: None,
             paused: false,
             next_at: Instant::now(),
         }
@@ -78,9 +84,9 @@ impl Poller {
         !self.paused && Instant::now() >= self.next_at
     }
 
-    /// One refresh: reads the item and its latest forecast conditionally.
-    pub fn poll(&mut self, ctx: &Context, token: &str, model: &mut WatchModel) {
-        match self.refresh(ctx, token, model) {
+    /// One refresh: reads the item, its latest forecast and its story conditionally.
+    pub fn poll(&mut self, ctx: &Context, item: &Resolved, model: &mut WatchModel) {
+        match self.refresh(ctx, item, model) {
             Ok(()) => {
                 self.backoff = None;
                 self.next_at = Instant::now() + self.interval;
@@ -102,35 +108,28 @@ impl Poller {
         }
     }
 
-    fn refresh(&mut self, ctx: &Context, token: &str, model: &mut WatchModel) -> CliResult<()> {
-        let link = ctx.app()?.link(token);
-        let options = AppReadOptions {
-            item: None,
-            if_none_match: self.item_etag.clone(),
-        };
-        if let Conditional::Modified { etag, value } = link.read(&options)? {
+    fn refresh(&mut self, ctx: &Context, item: &Resolved, model: &mut WatchModel) -> CliResult<()> {
+        let app = ctx.app()?;
+        let link = item.link(&app);
+        if let Conditional::Modified { etag, value } = link.read(&since(&self.item_etag))? {
             self.item_etag = etag;
             model.apply_item(&value);
         }
-        let options = AppReadOptions {
-            item: None,
-            if_none_match: self.forecast_etag.clone(),
-        };
-        match link.latest_forecast(&options) {
-            Ok(Conditional::Modified { etag, value }) => {
+        match empty_when_missing(link.latest_forecast(&since(&self.forecast_etag)))? {
+            Some(Conditional::Modified { etag, value }) => {
                 self.forecast_etag = etag;
                 model.forecast = Some(value);
             }
-            Ok(Conditional::NotModified) => {}
-            // No forecast yet is an empty state, not an error.
-            Err(custd_sdk::Error::Api(custd_sdk::ApiError { status: 404, .. })) => {
-                model.forecast = None
-            }
-            Err(error) => return Err(error.into()),
+            Some(Conditional::NotModified) => {}
+            None => model.forecast = None,
         }
-        let store = ctx.load_store()?;
-        if let Some(item) = store.find_by_token(&ctx.host, token) {
-            model.recent = item.recent.clone();
+        match empty_when_missing(link.forecast_story(&since(&self.story_etag)))? {
+            Some(Conditional::Modified { etag, value }) => {
+                self.story_etag = etag;
+                model.measurements = value.observations;
+            }
+            Some(Conditional::NotModified) => {}
+            None => model.measurements.clear(),
         }
         Ok(())
     }
@@ -140,14 +139,32 @@ impl Poller {
     }
 }
 
+/// A read that answers 304 while the caller's copy (`etag`) is current.
+fn since(etag: &Option<String>) -> AppReadOptions {
+    AppReadOptions {
+        item: None,
+        if_none_match: etag.clone(),
+    }
+}
+
+/// No forecast or story yet is an empty state, not an error.
+fn empty_when_missing<T>(result: custd_sdk::Result<T>) -> CliResult<Option<T>> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(Error::Api(ApiError { status: 404, .. })) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
 pub fn run(ctx: &Context, reference: &str, interval: Duration, images: bool) -> CliResult<()> {
     let resolved = ops::resolve(ctx, reference)?;
-    let read = ops::read_item(ctx, &resolved.token)?;
-    let kind = ops::item_kind(&read, resolved.kind);
+    let read = ops::read_item(ctx, &resolved)?;
+    let kind = ops::item_kind(&read);
     if kind != ItemKind::Counter {
-        return Err(crate::error::CliError::WrongKind(
-            "watch shows a counter".to_owned(),
-        ));
+        return Err(crate::error::CliError::WrongKind(format!(
+            "watch shows a counter; this is a {}",
+            kind.label()
+        )));
     }
     let mut model = WatchModel {
         card_url: ops::card_link(ctx, &resolved, kind, &read.item.role),
@@ -162,7 +179,7 @@ pub fn run(ctx: &Context, reference: &str, interval: Duration, images: bool) -> 
     };
     let result = event_loop(
         ctx,
-        &resolved.token,
+        &resolved,
         interval,
         &mut terminal,
         &mut model,
@@ -174,7 +191,7 @@ pub fn run(ctx: &Context, reference: &str, interval: Duration, images: bool) -> 
 
 fn event_loop(
     ctx: &Context,
-    token: &str,
+    item: &Resolved,
     interval: Duration,
     terminal: &mut ratatui::DefaultTerminal,
     model: &mut WatchModel,
@@ -183,7 +200,7 @@ fn event_loop(
     let mut poller = Poller::new(interval);
     loop {
         if poller.due() {
-            poller.poll(ctx, token, model);
+            poller.poll(ctx, item, model);
         }
         terminal.draw(|frame| render(frame, model, card.as_mut()))?;
         if !event::poll(KEY_WAIT)? {
@@ -251,10 +268,10 @@ pub fn render(frame: &mut Frame, model: &WatchModel, card: Option<&mut StatefulP
         Paragraph::new(sentence).wrap(Wrap { trim: true }),
         sentence_area,
     );
-    let [card_area, recent_area] =
+    let [card_area, history_area] =
         Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(right);
     render_card(frame, model, card, card_area);
-    render_recent(frame, model, recent_area);
+    render_history(frame, model, history_area);
     frame.render_widget(Line::from(model.status.clone()).dim(), status);
 }
 
@@ -302,9 +319,9 @@ fn quantile(sorted: &[f64], q: f64) -> f64 {
 
 fn render_chart(frame: &mut Frame, model: &WatchModel, area: Rect) {
     let measured: Vec<(f64, f64)> = model
-        .recent
+        .measurements
         .iter()
-        .filter_map(|m| parse_rfc3339(&m.at).map(|at| (at as f64, m.value)))
+        .filter_map(|m| parse_rfc3339(&m.observed_at).map(|at| (at as f64, m.value)))
         .collect();
     let band = model
         .forecast
@@ -423,20 +440,23 @@ fn render_card(
     }
 }
 
-fn render_recent(frame: &mut Frame, model: &WatchModel, area: Rect) {
+fn render_history(frame: &mut Frame, model: &WatchModel, area: Rect) {
     let items: Vec<ListItem> = model
-        .recent
+        .measurements
         .iter()
         .rev()
         .map(|m| {
             ListItem::new(format!(
                 "{}  {}",
-                m.at.get(..16).unwrap_or(&m.at).replace('T', " "),
+                m.observed_at
+                    .get(..16)
+                    .unwrap_or(&m.observed_at)
+                    .replace('T', " "),
                 m.value
             ))
         })
         .collect();
-    let block = Block::bordered().title("Added from here");
+    let block = Block::bordered().title("Measurements");
     if items.is_empty() {
         frame.render_widget(
             Paragraph::new("None yet. `done-when add` records one.").block(block),
