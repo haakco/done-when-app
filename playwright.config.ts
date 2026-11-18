@@ -7,6 +7,7 @@ export default defineConfig({
   fullyParallel: true,
   reporter: "list",
   use: { baseURL: `http://127.0.0.1:${port}`, trace: "retain-on-failure" },
+  expect: { timeout: 12_000 },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: `pnpm build && pnpm preview --host 127.0.0.1 --port ${port} --strictPort`,

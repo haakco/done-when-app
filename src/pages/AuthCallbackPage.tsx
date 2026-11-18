@@ -1,27 +1,23 @@
-import { useQuery } from "@tanstack/react-query";
-import { Navigate } from "react-router";
-import { QueryState } from "../components/QueryState";
-import { data } from "../data";
+import { Link } from "react-router";
+import { useSession } from "../components/Session";
 
+/** The sign-in redirect lands here; the hosted app provider finishes it and returns to the page it started on. */
 export function AuthCallbackPage() {
-  const completion = useQuery({
-    queryKey: ["sign-in-callback", window.location.href],
-    queryFn: () => data.completeSignIn(window.location.href),
-    retry: false,
-    staleTime: Number.POSITIVE_INFINITY,
-  });
+  const session = useSession();
+  if (session.failed) {
+    return (
+      <div className="notice notice--error" role="alert">
+        <h1>Sign-in did not finish</h1>
+        <p>Nothing was changed. Go back and try signing in again.</p>
+        <Link className="button" to="/mine">
+          Back to My items
+        </Link>
+      </div>
+    );
+  }
   return (
-    <QueryState query={completion} what="sign-in">
-      {(result) =>
-        result.status === "signed_in" ? (
-          <Navigate to={result.returnTo} replace />
-        ) : (
-          <div className="notice notice--error" role="alert">
-            <h1>Sign-in did not finish</h1>
-            <p>{result.message}</p>
-          </div>
-        )
-      }
-    </QueryState>
+    <p role="status" className="muted">
+      Signing you in…
+    </p>
   );
 }

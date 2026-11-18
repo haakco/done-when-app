@@ -1,54 +1,60 @@
-import type { Access, ItemKind } from "../data/types";
+import { appItemOwnerUrl, appItemShareUrl, parseAppItemLink } from "@haakco/custd-sdk/browser";
+import { KIND_PATH } from "../data/mappers";
+import type { ItemAccess, ItemKind } from "../data/types";
 
-const KIND_SEGMENT: Record<ItemKind, string> = { counter: "c", project: "p", dashboard: "d" };
+const ITEM_FRAGMENT = "item=";
 
-/** Share links are short and unfurl with a preview; owner links sit under /edit and never unfurl. */
-export function itemPath(kind: ItemKind, access: Access, token: string): string {
-  const path = `/${KIND_SEGMENT[kind]}/${encodeURIComponent(token)}`;
-  return access === "owner" ? `/edit${path}` : path;
+/** In-app path of the SDK's URL for this item, so links work on any origin, local ones included. */
+function pathOf(url: string): string {
+  const parsed = new URL(url);
+  return `${parsed.pathname}${parsed.hash}`;
 }
 
-export function itemUrl(origin: string, kind: ItemKind, access: Access, token: string): string {
-  return `${origin}${itemPath(kind, access, token)}`;
+/** The owner page: the token sits in the fragment, which never reaches a server or analytics. */
+export function ownerPath(kind: ItemKind, ownerToken: string): string {
+  return pathOf(appItemOwnerUrl({ host: "app.invalid", kindPath: KIND_PATH[kind], token: ownerToken }));
+}
+
+/** The owner page of an item the signed-in user owns, opened without a link. */
+export function ownedItemPath(kind: ItemKind, itemUuid: string): string {
+  return `/edit/${KIND_PATH[kind]}#${ITEM_FRAGMENT}${encodeURIComponent(itemUuid)}`;
+}
+
+export function sharePath(kind: ItemKind, shareToken: string): string {
+  return pathOf(appItemShareUrl({ host: "app.invalid", kindPath: KIND_PATH[kind], token: shareToken }));
+}
+
+export function absoluteUrl(path: string, origin: string = window.location.origin): string {
+  return `${origin}${path}`;
+}
+
+/** Reads the owner page's fragment: an owner token, or `item=<uuid>` for a signed-in owner. */
+export function ownerAccessFromHash(hash: string): ItemAccess | null {
+  const fragment = hash.replace(/^#/, "");
+  if (fragment.startsWith(ITEM_FRAGMENT)) {
+    const item = decodeURIComponent(fragment.slice(ITEM_FRAGMENT.length));
+    return item === "" ? null : { item };
+  }
+  return parseAppItemLink(fragment)?.token ?? null;
+}
+
+/** The token in a pasted share link, owner link or bare token. */
+export function tokenFromPaste(input: string): string | null {
+  return parseAppItemLink(input)?.token ?? null;
 }
 
 export type ClipboardWriter = Pick<Clipboard, "writeText">;
 export type CopyFailureReason = "clipboard_unavailable" | "clipboard_refused";
 export type CopyResult = { status: "copied" } | { status: "failed"; reason: CopyFailureReason };
 
-export async function copyLink(url: string, clipboard: ClipboardWriter | undefined): Promise<CopyResult> {
+export async function copyText(text: string, clipboard: ClipboardWriter | undefined): Promise<CopyResult> {
   if (clipboard === undefined) {
     return { status: "failed", reason: "clipboard_unavailable" };
   }
   try {
-    await clipboard.writeText(url);
+    await clipboard.writeText(text);
     return { status: "copied" };
   } catch {
     return { status: "failed", reason: "clipboard_refused" };
   }
-}
-
-export type ItemRef = { kind: ItemKind | null; token: string };
-
-const SEGMENT_KIND: Record<string, ItemKind> = { c: "counter", p: "project", d: "dashboard" };
-const BARE_TOKEN = /^[A-Za-z0-9_-]+$/;
-
-/** Reads a pasted share link, owner link or bare token. */
-export function parseItemRef(input: string): ItemRef | null {
-  const trimmed = input.trim();
-  if (BARE_TOKEN.test(trimmed)) {
-    return { kind: null, token: trimmed };
-  }
-  let url: URL;
-  try {
-    url = new URL(trimmed);
-  } catch {
-    return null;
-  }
-  const match = /^(?:\/edit)?\/([cpd])\/([^/]+)$/.exec(url.pathname);
-  const kind = match?.[1] === undefined ? undefined : SEGMENT_KIND[match[1]];
-  if (kind === undefined || match?.[2] === undefined) {
-    return null;
-  }
-  return { kind, token: decodeURIComponent(match[2]) };
 }

@@ -1,52 +1,61 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { QueryState } from "../components/QueryState";
-import { useMyItems, useSignInState } from "../data/queries";
+import { WriteError } from "../components/ItemStates";
+import { useSession } from "../components/Session";
+import { WithData } from "../components/WithData";
+import type { DoneWhenData } from "../data";
 import { formatDate } from "../lib/dates";
-import { itemPath } from "../lib/links";
+import { ownedItemPath } from "../lib/links";
 
 export function MyItemsPage() {
-  const signIn = useSignInState();
   return (
     <>
       <h1>My items</h1>
-      <QueryState query={signIn} what="sign-in state">
-        {(state) => (state.status === "signed_in" ? <ItemList /> : <SignedOut />)}
-      </QueryState>
+      <WithData>{({ data }) => <MyItems data={data} />}</WithData>
     </>
   );
 }
 
-function SignedOut() {
-  return (
-    <div className="notice">
-      <p>Sign in to keep your counters, projects and dashboards in one list and claim items you made by link.</p>
-      <p className="small muted">Sign-in is coming soon. Until then, keep your owner links somewhere safe.</p>
-    </div>
-  );
+function MyItems({ data }: { data: DoneWhenData }) {
+  const session = useSession();
+  if (!session.available) {
+    return <p className="notice">Sign-in is not turned on here. Keep your owner links somewhere safe: they are how you get back to your items.</p>;
+  }
+  if (!session.signedIn) {
+    return (
+      <div className="notice">
+        <p>Sign in to keep your counters, projects and dashboards in one list. Items you make while signed in are added for you; open an owner link and choose &ldquo;Add to my items&rdquo; for older ones.</p>
+        <button type="button" className="button button--primary" disabled={session.pending} onClick={() => { session.signIn("/mine"); }}>
+          Sign in
+        </button>
+        {session.failed ? <p className="field__error">Sign-in did not finish. Try again.</p> : null}
+      </div>
+    );
+  }
+  return <ItemList data={data} />;
 }
 
-function ItemList() {
-  const items = useMyItems();
+function ItemList({ data }: { data: DoneWhenData }) {
+  const items = useQuery({ queryKey: ["my-items"], queryFn: () => data.listMyItems() });
+  if (items.isPending) return <p role="status" className="muted">Loading your items…</p>;
+  if (items.isError) return <WriteError error={items.error} />;
+  if (items.data.length === 0) {
+    return (
+      <p className="notice">
+        Nothing here yet. <Link to="/">Start a counter</Link>, or open an owner link and choose &ldquo;Add to my items&rdquo;.
+      </p>
+    );
+  }
   return (
-    <QueryState query={items} what="items">
-      {(list) =>
-        list.length === 0 ? (
-          <p className="muted">
-            Nothing yet. <Link to="/new/counter">Start a counter</Link>.
-          </p>
-        ) : (
-          <ul className="item-list">
-            {list.map((item) => (
-              <li key={item.ownerToken} className="card">
-                <Link to={itemPath(item.kind, "owner", item.ownerToken)}>{item.name}</Link>
-                <span className="small muted">
-                  {item.kind} · updated {formatDate(item.updatedAt)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-    </QueryState>
+    <ul className="item-list">
+      {items.data.map((item) => (
+        <li key={item.itemUuid} className="card row-between">
+          <Link to={ownedItemPath(item.kind === "dashboard" ? "dashboard" : "counter", item.itemUuid)}>{item.name || "Dashboard"}</Link>
+          <span className="small muted">
+            {item.status ? `${item.status} · ` : ""}updated {formatDate(item.updatedAt)}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

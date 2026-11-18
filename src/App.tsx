@@ -2,15 +2,13 @@ import { Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { ApiPage } from "./pages/ApiPage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
-import { CounterPage } from "./pages/CounterPage";
-import { DashboardPage } from "./pages/DashboardPage";
 import { HomePage } from "./pages/HomePage";
+import { OwnerPage, SharePage } from "./pages/ItemPage";
 import { MyItemsPage } from "./pages/MyItemsPage";
 import { NewCounterPage } from "./pages/NewCounterPage";
 import { NewDashboardPage } from "./pages/NewDashboardPage";
 import { NewProjectPage } from "./pages/NewProjectPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
-import { ProjectPage } from "./pages/ProjectPage";
 
 /** Every app route. Keep public/custd-app.json's SPA fallbacks and shareable routes in step. */
 export function App() {
@@ -21,12 +19,10 @@ export function App() {
         <Route path="new/counter" element={<NewCounterPage />} />
         <Route path="new/project" element={<NewProjectPage />} />
         <Route path="new/dashboard" element={<NewDashboardPage />} />
-        <Route path="c/:token" element={<CounterPage mode="share" />} />
-        <Route path="edit/c/:token" element={<CounterPage mode="owner" />} />
-        <Route path="p/:token" element={<ProjectPage mode="share" />} />
-        <Route path="edit/p/:token" element={<ProjectPage mode="owner" />} />
-        <Route path="d/:token" element={<DashboardPage mode="share" />} />
-        <Route path="edit/d/:token" element={<DashboardPage mode="owner" />} />
+        <Route path="c/:token" element={<SharePage />} />
+        <Route path="p/:token" element={<SharePage />} />
+        <Route path="d/:token" element={<SharePage />} />
+        <Route path="edit/:kind" element={<OwnerPage />} />
         <Route path="mine" element={<MyItemsPage />} />
         <Route path="api" element={<ApiPage />} />
         <Route path="auth/callback" element={<AuthCallbackPage />} />

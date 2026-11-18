@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router";
+import { useSession } from "./Session";
 
 export function Layout() {
   return (
@@ -25,6 +26,7 @@ export function Layout() {
               <li>
                 <NavLink to="/api">API</NavLink>
               </li>
+              <AccountLink />
             </ul>
           </nav>
         </div>
@@ -33,5 +35,23 @@ export function Layout() {
         <Outlet />
       </main>
     </>
+  );
+}
+
+function AccountLink() {
+  const session = useSession();
+  if (!session.available) return null;
+  return (
+    <li>
+      {session.signedIn ? (
+        <button type="button" className="link-button" onClick={session.signOut}>
+          Sign out
+        </button>
+      ) : (
+        <button type="button" className="link-button" disabled={session.pending} onClick={() => { session.signIn(); }}>
+          Sign in
+        </button>
+      )}
+    </li>
   );
 }

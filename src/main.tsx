@@ -1,9 +1,9 @@
+import { CustdHostedAppProvider } from "@haakco/custd-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { StrictMode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router";
+import { BrowserRouter, useNavigate } from "react-router";
 import { App } from "./App";
-import { ItemNotFoundError } from "./data";
 import "./styles/app.css";
 
 const root = document.getElementById("root");
@@ -13,19 +13,32 @@ if (root === null) {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      refetchIntervalInBackground: false,
-      // A missing or expired link will not appear on retry; show the not-found state at once.
-      retry: (failures, error) => !(error instanceof ItemNotFoundError) && failures < 3,
-    },
+    queries: { refetchIntervalInBackground: false, retry: 1 },
+    mutations: { retry: false },
   },
 });
+
+/** Starts the hosted app once; a finished sign-in returns to the page it began on. */
+function HostedApp({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  return (
+    <CustdHostedAppProvider
+      onSignInComplete={(returnTo) => {
+        void navigate(returnTo, { replace: true });
+      }}
+    >
+      {children}
+    </CustdHostedAppProvider>
+  );
+}
 
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <HostedApp>
+          <App />
+        </HostedApp>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

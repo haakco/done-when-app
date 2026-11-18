@@ -1,76 +1,94 @@
-/** Typed shapes the pages render. The placeholder source and, later, the Custd SDK both return these. */
+/** Typed shapes the pages render, mapped from Custd's app item reads in `mappers.ts`. */
+
+import type { AppForecastMethod, AppItemAccess, AppItemLink, AppItemOwnership, AppLinkRole } from "@haakco/custd-sdk/browser";
 
 export type ItemKind = "counter" | "project" | "dashboard";
-/** Owner links read and write one item; share links only read it. */
-export type Access = "owner" | "share";
 
-export type ItemLinks = { ownerToken: string; shareToken: string };
+/** Owner links read and change one item; share links only read it. */
+export type Access = AppLinkRole;
+
+/** A link token, or `{ item }` for an item the signed-in user owns. */
+export type ItemAccess = AppItemAccess;
 
 export type Measurement = { measuredAt: string; value: number };
 
-export type ForecastMethod = "bayesian_linear" | "seasonal_7d";
+export type ForecastMethod = Extract<AppForecastMethod, "bayesian_linear_regression" | "seasonal_7_day">;
+
+/** What every item page shows about the item itself, whatever its kind. */
+export type ItemMeta = {
+  itemUuid: string;
+  role: Access;
+  ownership: AppItemOwnership;
+  idleExpirySeconds: number;
+  expiresAt: string;
+  updatedAt: string;
+  /** Listed for an owner link only; tokens are never in it. */
+  links: AppItemLink[];
+};
 
 export type CounterForecast = {
-  method: ForecastMethod;
-  /** 90% interval and median for the completion date, as ISO timestamps. */
-  completionLow: string;
-  completionMedian: string;
-  completionHigh: string;
+  method: string;
+  generatedAt: string;
+  inputCount: number;
+  completionMedian: string | null;
+  /** 90% interval for the completion date; null until there are three measurements. */
+  completionLow: string | null;
+  completionHigh: string | null;
   /** Chance of reaching the target by the deadline, 0–1, or null without a deadline. */
   deadlineProbability: number | null;
+  forecastFrom: string | null;
+  posteriorLines: { points: { at: string; value: number }[] }[];
+  histogram: { bins: { start: string; end: string; count: number }[]; neverCount: number } | null;
+  pooledRunCount: number;
+  warnings: string[];
 };
 
 export type CounterStatus = "active" | "completed";
 
-export type Counter = {
+export type Counter = ItemMeta & {
   name: string;
   unit: string;
-  startValue: number;
   targetValue: number;
-  startedAt: string;
   deadline: string | null;
   status: CounterStatus;
   measurements: Measurement[];
-  /** Null until there are at least three measurements. */
+  /** The first measurement's value, or 0 before there is one. */
+  startValue: number;
+  latestValue: number;
   forecast: CounterForecast | null;
-  expiresAfterSeconds: number;
-  updatedAt: string;
+  method: ForecastMethod;
+  /** Whether this run's data is pooled with the earlier runs of its series. */
+  runSimilar: boolean;
+  /** Set when the counter is a later run in a series. */
+  seriesRootUuid: string | null;
 };
 
-export type ProjectEstimate = { recordedOn: string; low: string; high: string; note: string };
+export type ProjectEstimate = {
+  estimatedAt: string;
+  low: string;
+  high: string;
+  note: string;
+  widthDays: number;
+  /** How far the midpoint moved from the previous estimate, in days; positive is later. */
+  movementDays?: number;
+};
 
 export type ProjectStatus = "active" | "completed" | "canceled";
 
-export type Project = {
+export type Project = ItemMeta & {
   name: string;
   definitionOfDone: string;
   /** The date told to stakeholders. */
-  deliveryTarget: string;
+  deliveryTarget: string | null;
   estimates: ProjectEstimate[];
-  /** Chance of landing by the delivery target from the latest estimate, 0–1. */
-  chanceByTarget: number | null;
+  latest: { chanceByTarget: number | null; ageDays: number; movementDays: number | null } | null;
   status: ProjectStatus;
-  completedOn: string | null;
-  expiresAfterSeconds: number;
-  updatedAt: string;
+  completedAt: string | null;
 };
 
-export type DashboardEntry = {
-  kind: Exclude<ItemKind, "dashboard">;
-  shareToken: string;
-  name: string;
-  /** One-line state, such as "64% · likely 3–9 Dec". */
-  summary: string;
-};
+export type DashboardEntry = { entryUuid: string; itemUuid: string };
 
-export type Dashboard = {
-  name: string;
-  entries: DashboardEntry[];
-  expiresAfterSeconds: number;
-  updatedAt: string;
-};
-
-export type ItemView<TItem> = { access: Access; item: TItem; links: ItemLinks | null };
+export type Dashboard = ItemMeta & { entries: DashboardEntry[] };
 
 export type CounterDraft = {
   name: string;
@@ -78,6 +96,7 @@ export type CounterDraft = {
   startValue: number;
   targetValue: number;
   startedAt: string;
+  /** RFC 3339, or null for no deadline. */
   deadline: string | null;
   history: Measurement[];
   expiresAfterSeconds: number;
@@ -86,18 +105,19 @@ export type CounterDraft = {
 export type ProjectDraft = {
   name: string;
   definitionOfDone: string;
+  /** RFC 3339. */
   deliveryTarget: string;
   expiresAfterSeconds: number;
 };
 
-export type DashboardDraft = { name: string; entryRefs: string[]; expiresAfterSeconds: number };
+export type DashboardDraft = { entryRefs: string[]; expiresAfterSeconds: number };
 
 export type EstimateDraft = { low: string; high: string; note: string };
 
-export type CreatedItem = { kind: ItemKind; links: ItemLinks };
+export type CreatedItem = { kind: ItemKind; itemUuid: string; ownerToken: string; shareToken: string };
 
-export type MyItem = { kind: ItemKind; name: string; ownerToken: string; updatedAt: string };
+export type ForecastSettings = { method: ForecastMethod; forecastFrom: string | null };
 
-export type SignInState = { status: "signed_out" } | { status: "signed_in"; displayName: string };
+export type MeasurementsAdded = { accepted: number; rejected: number; targetReached: boolean };
 
-export type SignInCompletion = { status: "signed_in"; returnTo: string } | { status: "failed"; message: string };
+export type MyItem = { itemUuid: string; kind: "item" | "dashboard"; name: string; status: string; updatedAt: string };

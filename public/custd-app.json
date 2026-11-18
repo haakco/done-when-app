@@ -2,24 +2,86 @@
   "indexFile": "index.html",
   "notFoundPage": "404.html",
   "spaFallbacks": [
-    { "prefix": "/new/", "file": "index.html" },
-    { "prefix": "/c/", "file": "index.html" },
-    { "prefix": "/p/", "file": "index.html" },
-    { "prefix": "/d/", "file": "index.html" },
-    { "prefix": "/edit/", "file": "index.html" },
-    { "prefix": "/mine/", "file": "index.html" },
-    { "prefix": "/api/", "file": "index.html" },
-    { "prefix": "/auth/", "file": "index.html" }
+    {
+      "prefix": "/new/",
+      "file": "index.html"
+    },
+    {
+      "prefix": "/c/",
+      "file": "index.html"
+    },
+    {
+      "prefix": "/p/",
+      "file": "index.html"
+    },
+    {
+      "prefix": "/d/",
+      "file": "index.html"
+    },
+    {
+      "prefix": "/edit/",
+      "file": "index.html"
+    },
+    {
+      "prefix": "/mine/",
+      "file": "index.html"
+    },
+    {
+      "prefix": "/api/",
+      "file": "index.html"
+    },
+    {
+      "prefix": "/auth/",
+      "file": "index.html"
+    }
   ],
   "headers": [
     {
       "route": "/edit/**",
       "headers": [
-        { "name": "Referrer-Policy", "value": "no-referrer" },
-        { "name": "X-Robots-Tag", "value": "noindex" }
+        {
+          "name": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "name": "X-Robots-Tag",
+          "value": "noindex"
+        }
       ]
     }
   ],
-  "cache": [{ "match": "assets/**", "mode": "immutable" }],
-  "shareableRoutes": [{ "route": "/c/*" }, { "route": "/p/*" }, { "route": "/d/*" }]
+  "cache": [
+    {
+      "match": "assets/**",
+      "mode": "immutable"
+    }
+  ],
+  "shareableRoutes": [
+    {
+      "route": "/c/*",
+      "kind": "measurement_project",
+      "cardTemplate": "share-cards/counter.svg",
+      "title": "{{name}}",
+      "description": "Counting to {{target}}. Open the link for the live forecast."
+    },
+    {
+      "route": "/p/*",
+      "kind": "measurement_project",
+      "cardTemplate": "share-cards/project.svg",
+      "title": "{{name}}",
+      "description": "Likely {{estimateLow}} – {{estimateHigh}}, {{chance}}% chance by {{deliveryTarget}}."
+    },
+    {
+      "route": "/d/*",
+      "kind": "link_collection",
+      "cardTemplate": "share-cards/dashboard.svg",
+      "title": "Dashboard on Done When?",
+      "description": "{{itemCount}} counters and projects on one screen that updates itself."
+    }
+  ],
+  "siteCard": {
+    "title": "Done When?",
+    "description": "Count your progress, get an honest forecast, share one link.",
+    "cardTemplate": "share-cards/site.svg"
+  }
 }

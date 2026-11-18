@@ -1,11 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="{{name}}: {{current}} of {{target}} {{unit}}">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="{{name}}: counting to {{target}} {{unit}}">
   <rect width="1200" height="630" fill="#f6f2ea"/>
   <text x="80" y="120" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="40" fill="#5b554b">Done When? · Counter</text>
-  <text x="80" y="210" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="64" font-weight="700" fill="#1f1c17">{{name}}</text>
-  <text x="80" y="340" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="120" fill="#1f1c17">{{current}}<tspan font-size="48" fill="#5b554b"> / {{target}} {{unit}}</tspan></text>
-  <rect x="80" y="390" width="1040" height="28" rx="14" fill="#d5ebe7"/>
-  <rect x="80" y="390" width="{{progressWidth}}" height="28" rx="14" fill="#0d6b64"/>
+  <text x="80" y="230" font-family="Iowan Old Style, Palatino, Georgia, serif" font-size="72" font-weight="700" fill="#1f1c17">{{name}}</text>
+  <text x="80" y="320" font-family="system-ui, sans-serif" font-size="44" fill="#5b554b">Target {{target}} {{unit}}</text>
+  <svg x="80" y="390" width="1040" height="28">
+    <rect width="100%" height="28" rx="14" fill="#d5ebe7"/>
+    <rect width="{{percent}}%" height="28" rx="14" fill="#0d6b64"/>
+  </svg>
   <rect x="1114" y="378" width="6" height="52" fill="#b8410f"/>
-  <text x="80" y="480" font-family="system-ui, sans-serif" font-size="36" fill="#1f1c17">{{percent}}% done</text>
-  <text x="80" y="540" font-family="system-ui, sans-serif" font-size="36" font-weight="600" fill="#0d6b64">{{forecast}}</text>
+  <text x="80" y="520" font-family="system-ui, sans-serif" font-size="36" font-weight="600" fill="#0d6b64">Open the link for the live forecast</text>
 </svg>

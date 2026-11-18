@@ -2,15 +2,17 @@ import { useState } from "react";
 import type { Measurement } from "../data";
 import { parseMeasurementCsv, type CsvRowError } from "../lib/csv";
 import { Field } from "./Field";
+import { WriteError } from "./ItemStates";
 
 /** `onSubmit` reports success through `onSaved`; failures show through `error`. */
 type SubmitProps = {
   onSubmit: (measurements: Measurement[], onSaved: () => void) => void;
   pending: boolean;
-  error: Error | null;
+  error: unknown;
+  unit?: string;
 };
 
-export function AddMeasurementForm({ onSubmit, pending, error }: SubmitProps) {
+export function AddMeasurementForm({ onSubmit, pending, error, unit }: SubmitProps) {
   const [value, setValue] = useState("");
   return (
     <form
@@ -22,11 +24,12 @@ export function AddMeasurementForm({ onSubmit, pending, error }: SubmitProps) {
         });
       }}
     >
-      <Field label="New value" hint="Recorded now." error={error?.message ?? null}>
+      <Field label="New value" hint={`The total so far${unit ? ` in ${unit}` : ""}, recorded now.`}>
         {(control) => (
-          <input {...control} type="number" step="any" required value={value} onChange={(event) => { setValue(event.target.value); }} />
+          <input {...control} type="number" step="any" inputMode="decimal" required value={value} onChange={(event) => { setValue(event.target.value); }} />
         )}
       </Field>
+      <WriteError error={error} />
       <div className="button-row">
         <button type="submit" className="button button--primary" disabled={pending}>
           {pending ? "Adding…" : "Add measurement"}
@@ -54,10 +57,10 @@ export function CsvImportForm({ onSubmit, pending, error }: SubmitProps) {
       }}
     >
       <CsvField text={text} onText={setText} rowErrors={rowErrors} />
-      {error ? <p className="field__error">{error.message}</p> : null}
+      <WriteError error={error} />
       <div className="button-row">
         <button type="submit" className="button" disabled={pending}>
-          {pending ? "Importing…" : "Import rows"}
+          {pending ? "Adding…" : "Add these measurements"}
         </button>
       </div>
     </form>
@@ -67,11 +70,11 @@ export function CsvImportForm({ onSubmit, pending, error }: SubmitProps) {
 type CsvFieldProps = { text: string; onText: (text: string) => void; rowErrors: CsvRowError[]; label?: string };
 
 /** Paste or choose a two-column CSV. Bad rows are listed by line and nothing is added until fixed. */
-export function CsvField({ text, onText, rowErrors, label = "CSV rows" }: CsvFieldProps) {
+export function CsvField({ text, onText, rowErrors, label = "Measurements" }: CsvFieldProps) {
   const summary = rowErrors.length > 0 ? `${rowErrors.length} row${rowErrors.length === 1 ? "" : "s"} need fixing; nothing was added.` : null;
   return (
     <>
-      <Field label={label} hint="Two columns: ISO timestamp, value. One row per line; a header row is fine." error={summary}>
+      <Field label={label} hint="One row per line: date or time, then the value, e.g. 2026-11-01,12. A header row is fine." error={summary}>
         {(control) => (
           <textarea {...control} value={text} placeholder={"2026-11-01T09:00:00Z,12\n2026-11-02T09:00:00Z,15"} onChange={(event) => { onText(event.target.value); }} />
         )}
