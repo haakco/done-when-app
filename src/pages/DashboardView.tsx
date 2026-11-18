@@ -1,6 +1,7 @@
 import type { AppItemRead } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { DownloadMenu } from "../components/DownloadMenu";
 import { Field } from "../components/Field";
 import { ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
@@ -12,7 +13,8 @@ import { explainError, isGone, type DashboardEntry, type DoneWhenData, type Item
 import { dashboardOf, modelOf, projectOf, useCounter, useItemRead, useModelRun } from "../data/live";
 import { itemKindOf, itemNameOf } from "../data/mappers";
 import { modelOutputs } from "./ModelView";
-import { counterSummary, projectSummary } from "../lib/forecast-text";
+import { dashboardWorkbook } from "../lib/exports";
+import { counterSummary, modelHeadline, projectSummary } from "../lib/forecast-text";
 import type { ItemViewProps } from "./view-props";
 
 export function DashboardView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
@@ -20,7 +22,15 @@ export function DashboardView({ data, access, read, live, showOwnerTools, ownerR
   const count = dashboard.entries.length;
   return (
     <article aria-labelledby="item-name" className="item">
-      <ItemHeader data={data} access={access} kind="dashboard" meta={dashboard} title="Dashboard" owner={showOwnerTools}>
+      <ItemHeader
+        data={data}
+        access={access}
+        kind="dashboard"
+        meta={dashboard}
+        title="Dashboard"
+        owner={showOwnerTools}
+        actions={count > 0 ? <DownloadMenu name="dashboard" build={async () => dashboardWorkbook(await data.dashboardRows(access, dashboard.entries))} /> : null}
+      >
         <span className="small muted">
           {count} item{count === 1 ? "" : "s"}
         </span>
@@ -113,16 +123,10 @@ function ModelEntry({ access, read, item }: { access: ItemAccess; read: AppItemR
   const model = modelOf(read);
   const run = useModelRun(access, { item });
   const output = modelOutputs(model)[0];
-  const summary = run.status === "ready" ? run.data?.quantities?.find((result) => result.name === output)?.summary : undefined;
-  const number = (value: number) => value.toLocaleString("en", { maximumSignificantDigits: 3 });
   return (
     <>
       <p className="small muted">Model{model.latestVersion > 0 ? ` · version ${model.latestVersion}` : ""}</p>
-      <p className="entry__headline">
-        {summary && output
-          ? `${output}: about ${number(summary.percentiles.p50)} (90%: ${number(summary.percentiles.p5)} – ${number(summary.percentiles.p95)})`
-          : "No results yet"}
-      </p>
+      <p className="entry__headline">{modelHeadline(output, run.status === "ready" ? run.data : null)}</p>
     </>
   );
 }

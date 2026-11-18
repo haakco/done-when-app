@@ -16,16 +16,21 @@ type HeaderProps = {
   owner: boolean;
   /** Status badges beside the title. */
   children?: ReactNode;
+  /** Shown after Share, e.g. the Download menu. */
+  actions?: ReactNode;
 };
 
-/** The title with one Share button beside it, and the owner's one-time "save your owner link" notice. */
-export function ItemHeader({ data, access, kind, meta, title, owner, children }: HeaderProps) {
+/** The title with the Share button (and any other actions) beside it, and the owner's one-time "save your owner link" notice. */
+export function ItemHeader({ data, access, kind, meta, title, owner, children, actions }: HeaderProps) {
   return (
     <>
       <header className="item__head">
         <h1 id="item-name">{title}</h1>
         {children}
-        <ShareButton data={data} access={access} kind={kind} meta={meta} owner={owner} />
+        <div className="item__actions">
+          <ShareButton data={data} access={access} kind={kind} meta={meta} owner={owner} />
+          {actions}
+        </div>
       </header>
       {owner && typeof access === "string" ? <OwnerLinkNotice itemUuid={meta.itemUuid} /> : null}
     </>

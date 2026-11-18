@@ -105,7 +105,7 @@ test("bad CSV rows are listed by line and nothing is created", async ({ page, fa
   await page.getByLabel("Target").fill("5");
   await page.getByLabel("Past numbers (optional)").fill("2026-11-01T00:00:00Z,1\nnot-a-date,2");
   await page.getByRole("button", { name: "Create counter" }).click();
-  await expect(page.getByText("Line 2: “not-a-date” is not an ISO timestamp")).toBeVisible();
+  await expect(page.getByText("Line 2: “not-a-date” is not a date")).toBeVisible();
   await expect(page).toHaveURL(/\/new\/counter$/);
   expect(fake.requests.filter((request) => request.method === "POST")).toHaveLength(0);
 });

@@ -88,14 +88,19 @@ heavy shadows. The progress bar is a thick rule with a finish tick at the target
 | `LiveLine` | One quiet line: "Updates by itself", or stale / offline with what happens next |
 | `ItemStates` | Loading, not-here, read-only, write error and service-unavailable states, each with a next action |
 | `.more` | Disclosure with a finish-colour chevron; 2.75rem tall summary |
+| `DownloadMenu` | Beside Share for every viewer: one "Download" disclosure with "Excel (.xlsx)" (every sheet) and "CSV" (the main table); the result in a polite status line |
+| `ImportPanel` | Owner tools "Import …": paste or choose a CSV or .xlsx, then a preview (count, bad rows by line, sample table) and one "Import N …" button |
 
 ## States
 
 Item pages: loading (a status line naming what is loading), not found or expired (with "start a
 new one"), read-only (owner tools absent, one line explaining the link is view-only), write
 failed (plain-words error next to the form, draft kept), stale and offline (the live line says
-the page shows what it had and retries), data service unavailable (reload). CSV import lists bad rows by line number and adds
-nothing until the rows are fixed.
+the page shows what it had and retries), data service unavailable (reload). Past numbers on the
+create form list bad rows by line number and create nothing until they are fixed. An owner's
+import (counter, project, model) previews every row first: a count, each bad row by line and
+reason, and the first rows as they will be sent; the owner then imports the good rows and skips
+the bad ones, and the result says how many landed and why it stopped, if it did.
 
 ## Accessibility
 
@@ -118,3 +123,4 @@ by Custd's share previews (A5). They use the same palette and the serif display 
 | 2026-11-18 | Summary first, one share button, owner tools behind disclosures; the create-counter form lives on the home page. |
 | 2026-11-18 | Share sits beside the title; the owner-link notice shows once per item per device; models are a first-class item kind. |
 | 2026-11-18 | Grid children get `min-width: 0` and controls `width: 100%`, so long option text never widens the page at 400px. |
+| 2026-11-18 | Downloads are built in the browser; the Excel library loads only on use. The first sheet uses the import's column names, so every download imports back. Imports preview first and send only the good rows. |

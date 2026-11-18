@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Measurement } from "../data";
-import { parseMeasurementCsv, type CsvRowError } from "../lib/csv";
+import type { CsvRowError } from "../lib/csv";
 import { Field } from "./Field";
 import { WriteError } from "./ItemStates";
 
@@ -33,34 +33,6 @@ export function AddMeasurementForm({ onSubmit, pending, error, unit }: SubmitPro
       <div className="button-row">
         <button type="submit" className="button button--primary" disabled={pending}>
           {pending ? "Adding…" : "Add measurement"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-export function CsvImportForm({ onSubmit, pending, error }: SubmitProps) {
-  const [text, setText] = useState("");
-  const [rowErrors, setRowErrors] = useState<CsvRowError[]>([]);
-  return (
-    <form
-      className="form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const parsed = parseMeasurementCsv(text);
-        setRowErrors(parsed.errors);
-        if (parsed.errors.length === 0) {
-          onSubmit(parsed.measurements, () => {
-            setText("");
-          });
-        }
-      }}
-    >
-      <CsvField text={text} onText={setText} rowErrors={rowErrors} />
-      <WriteError error={error} />
-      <div className="button-row">
-        <button type="submit" className="button" disabled={pending}>
-          {pending ? "Adding…" : "Add these measurements"}
         </button>
       </div>
     </form>

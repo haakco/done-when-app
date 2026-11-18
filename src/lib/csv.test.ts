@@ -3,9 +3,7 @@ import { parseMeasurementCsv } from "./csv";
 
 describe("parseMeasurementCsv", () => {
   it("reads timestamp,value rows and skips a header and blank lines", () => {
-    const result = parseMeasurementCsv(
-      "timestamp,value\r\n2026-11-01T00:00:00Z,10\r\n\r\n2026-11-02,12.5\n",
-    );
+    const result = parseMeasurementCsv("timestamp,value\r\n2026-11-01T00:00:00Z,10\r\n\r\n2026-11-02,12.5\n");
     expect(result).toEqual({
       measurements: [
         { measuredAt: "2026-11-01T00:00:00.000Z", value: 10 },
@@ -26,22 +24,19 @@ describe("parseMeasurementCsv", () => {
     );
     expect(result.measurements).toEqual([{ measuredAt: "2026-11-01T00:00:00.000Z", value: 1 }]);
     expect(result.errors).toEqual([
-      { line: 2, message: "“yesterday” is not an ISO timestamp" },
+      { line: 2, message: "“yesterday” is not a date" },
       { line: 3, message: "“lots” is not a number" },
       { line: 4, message: "expected 2 columns, found 3" },
-      { line: 5, message: "“2026-13-01” is not an ISO timestamp" },
+      { line: 5, message: "“2026-13-01” is not a date" },
     ]);
   });
 
   it("treats only the first row as a possible header", () => {
     const result = parseMeasurementCsv("2026-11-01T00:00:00Z,1\ntimestamp,value");
-    expect(result.errors).toEqual([{ line: 2, message: "“timestamp” is not an ISO timestamp" }]);
+    expect(result.errors).toEqual([{ line: 2, message: "“timestamp” is not a date" }]);
   });
 
   it("reports empty input", () => {
-    expect(parseMeasurementCsv(" \n")).toEqual({
-      measurements: [],
-      errors: [{ line: 0, message: "no rows found" }],
-    });
+    expect(parseMeasurementCsv(" \n")).toEqual({ measurements: [], errors: [{ line: 0, message: "The file has no rows to import." }] });
   });
 });

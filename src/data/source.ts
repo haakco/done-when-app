@@ -11,12 +11,17 @@ import {
 import { rememberShareToken } from "../lib/device";
 import { tokenFromPaste } from "../lib/links";
 import { ALERT_ERROR_CODES, type AlertDeliveryList, type AlertRule, type AlertRuleSpec, type AlertSettings, type AlertSubscription, type AlertsClient, type AlertWebhookCreated } from "./alerts";
+import type { DashboardRow } from "../lib/exports";
+import { dashboardRow } from "./dashboard-export";
 import { counterCreateRequest, modelCreateRequest, projectCreateRequest } from "./mappers";
 import type {
   CounterDraft,
   CreatedItem,
   DashboardDraft,
+  DashboardEntry,
   EstimateDraft,
+  EstimateImport,
+  ImportOutcome,
   ForecastSettings,
   ItemAccess,
   Measurement,
@@ -30,6 +35,8 @@ import type {
 export const FORECAST_MIN_MEASUREMENTS = 3;
 /** Custd takes at most this many measurements per request. */
 const MEASUREMENT_BATCH = 1000;
+/** A dashboard download reads this many items at a time. */
+const DASHBOARD_READS_AT_ONCE = 5;
 
 /**
  * Every write the app makes, and the reads that are not live. Live item reads go through the
@@ -46,6 +53,8 @@ export type DoneWhenData = {
 
   createProject(draft: ProjectDraft): Promise<CreatedItem>;
   addEstimate(owner: ItemAccess, estimate: EstimateDraft): Promise<void>;
+  /** One request per estimate, in order; stops at the first failure. */
+  importEstimates(owner: ItemAccess, estimates: EstimateImport[]): Promise<ImportOutcome>;
   setDeliveryTarget(owner: ItemAccess, deliveryTarget: string): Promise<void>;
   completeProject(owner: ItemAccess, completedAt: string): Promise<void>;
   cancelProject(owner: ItemAccess): Promise<void>;
@@ -56,6 +65,8 @@ export type DoneWhenData = {
   runModel(owner: ItemAccess, request: Omit<AppModelRunRequest, "seed">): Promise<void>;
 
   createDashboard(draft: DashboardDraft): Promise<CreatedItem>;
+  /** One summary per dashboard item, read once for a download. */
+  dashboardRows(access: ItemAccess, entries: DashboardEntry[]): Promise<DashboardRow[]>;
   addDashboardEntry(owner: ItemAccess, pasted: string): Promise<void>;
   removeDashboardEntry(owner: ItemAccess, entryUuid: string): Promise<void>;
 
@@ -83,13 +94,18 @@ export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient):
   const runForecast = async (owner: ItemAccess, forecast: ForecastSettings) => {
     await items.runForecast(owner, { method: forecast.method, ...(forecast.forecastFrom ? { forecastFrom: forecast.forecastFrom } : {}) });
   };
+  /** Sends in batches; a failed batch stops the run and is returned with what already landed. */
   const addRows = async (owner: ItemAccess, rows: Measurement[]): Promise<MeasurementsAdded> => {
-    const added: MeasurementsAdded = { accepted: 0, rejected: 0, targetReached: false };
+    const added: MeasurementsAdded = { accepted: 0, rejected: 0, targetReached: false, failure: null };
     for (let start = 0; start < rows.length; start += MEASUREMENT_BATCH) {
       const batch = rows.slice(start, start + MEASUREMENT_BATCH);
-      const response: AppMeasurementBulkResponse = await items.addMeasurements(owner, {
-        rows: batch.map((row) => ({ observedAt: row.measuredAt, value: row.value })),
-      });
+      let response: AppMeasurementBulkResponse;
+      try {
+        response = await items.addMeasurements(owner, { rows: batch.map((row) => ({ observedAt: row.measuredAt, value: row.value })) });
+      } catch (error) {
+        if (added.accepted === 0 && added.rejected === 0) throw error;
+        return { ...added, failure: error };
+      }
       added.accepted += response.accepted;
       added.rejected += response.rejected;
       added.targetReached ||= response.completedTargetUuid !== undefined;
@@ -130,6 +146,23 @@ export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient):
     async addEstimate(owner, estimate) {
       await items.createEstimate(owner, { lowDate: estimate.low, highDate: estimate.high, ...(estimate.note ? { note: estimate.note } : {}) });
     },
+    async importEstimates(owner, estimates) {
+      let landed = 0;
+      for (const estimate of estimates) {
+        try {
+          await items.createEstimate(owner, {
+            lowDate: estimate.low,
+            highDate: estimate.high,
+            ...(estimate.estimatedAt ? { estimatedAt: estimate.estimatedAt } : {}),
+            ...(estimate.note ? { note: estimate.note } : {}),
+          });
+        } catch (error) {
+          return { landed, refused: 0, failure: error };
+        }
+        landed += 1;
+      }
+      return { landed, refused: 0, failure: null };
+    },
     async setDeliveryTarget(owner, deliveryTarget) {
       await items.updateSettings(owner, { project: { deliveryTargetDate: deliveryTarget } });
     },
@@ -156,6 +189,14 @@ export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient):
         await items.addEntry(result.ownerToken, { token: pastedToken(pasted) });
       }
       return created("dashboard", result);
+    },
+    async dashboardRows(access, entries) {
+      const rows: DashboardRow[] = [];
+      for (let start = 0; start < entries.length; start += DASHBOARD_READS_AT_ONCE) {
+        const batch = entries.slice(start, start + DASHBOARD_READS_AT_ONCE);
+        rows.push(...(await Promise.all(batch.map((entry) => dashboardRow(items, access, entry.itemUuid)))));
+      }
+      return rows;
     },
     async addDashboardEntry(owner, pasted) {
       await items.addEntry(owner, { token: pastedToken(pasted) });

@@ -1,13 +1,15 @@
 import { ArrivalHistogram, ForecastChart } from "@haakco/custd-react";
 import { useMutation } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { AlertsPanel } from "../components/AlertsPanel";
 import type { CreatedState, CounterFormValues } from "../components/CounterForm";
 import { Field } from "../components/Field";
 import { ItemFailed, Loading, ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
-import { AddMeasurementForm, CsvImportForm } from "../components/MeasurementForms";
+import { DownloadMenu } from "../components/DownloadMenu";
+import { ImportPanel } from "../components/ImportPanel";
+import { AddMeasurementForm } from "../components/MeasurementForms";
 import { MethodField } from "../components/MethodField";
 import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
 import { Progress } from "../components/Progress";
@@ -16,7 +18,9 @@ import { StatusBadge } from "../components/StatusBadge";
 import type { Counter, DoneWhenData, ForecastMethod, ItemAccess, Measurement } from "../data";
 import { useCounter } from "../data/live";
 import { dateInputToRfc3339, formatShortDate, rfc3339ToDateInput } from "../lib/dates";
+import { counterWorkbook } from "../lib/exports";
 import { counterSummary } from "../lib/forecast-text";
+import { MAX_ITEM_MEASUREMENTS, parseMeasurementTable } from "../lib/imports";
 import { formatRate, RATE_UNITS, ratePerSecond, type RateUnit } from "../lib/rate";
 import { useNarrow } from "../lib/use-narrow";
 import type { NewRunState } from "./NewCounterPage";
@@ -32,12 +36,26 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute }: 
   const summary = counterSummary(counter);
   return (
     <article aria-labelledby="item-name" className="item">
-      <ItemHeader data={data} access={access} kind="counter" meta={counter} title={counter.name} owner={showOwnerTools}>
+      <ItemHeader
+        data={data}
+        access={access}
+        kind="counter"
+        meta={counter}
+        title={counter.name}
+        owner={showOwnerTools}
+        actions={
+          <DownloadMenu
+            name={counter.name}
+            build={() => counterWorkbook(counter, new Date())}
+            note={counter.measurementsTruncated ? `Holds the newest ${counter.measurements.length} measurements; older ones are not in the file.` : null}
+          />
+        }
+      >
         <StatusBadge status={counter.status} />
       </ItemHeader>
       {showOwnerTools && rejectedAtCreate > 0 ? (
         <p className="notice notice--warn" role="alert">
-          {rejectedAtCreate} of your past numbers were not accepted. Add them again under &ldquo;Add several measurements&rdquo;.
+          {rejectedAtCreate} of your past numbers were not accepted. Add them again under &ldquo;Import measurements&rdquo;.
         </p>
       ) : null}
       <section className="summary" aria-label="Summary">
@@ -187,8 +205,32 @@ function QuickAdd({ data, access, counter }: { data: DoneWhenData; access: ItemA
   );
 }
 
+function MeasurementImport({ data, access, counter }: { data: DoneWhenData; access: ItemAccess; counter: Counter }) {
+  const held = counter.measurements.length;
+  const check = useCallback(
+    (rows: Measurement[]) => {
+      const room = MAX_ITEM_MEASUREMENTS - held;
+      if (rows.length <= room) return null;
+      return `This counter holds ${counter.measurementsTruncated ? "at least " : ""}${held.toLocaleString("en")} measurements and can take ${Math.max(room, 0).toLocaleString("en")} more; this file has ${rows.length.toLocaleString("en")}.`;
+    },
+    [held, counter.measurementsTruncated],
+  );
+  return (
+    <ImportPanel
+      what="measurements"
+      hint="Columns: time and value, with or without a header, in either order. Times without a zone are read as UTC."
+      placeholder={"time,value\n2026-11-01T09:00:00Z,12\n2026-11-02T09:00:00Z,15"}
+      parse={parseMeasurementTable}
+      check={check}
+      onImport={async (rows) => {
+        const added = await data.addMeasurements(access, rows, { method: counter.method, forecastFrom: counter.forecast?.forecastFrom ?? null }, held + rows.length);
+        return { landed: added.accepted, refused: added.rejected, failure: added.failure };
+      }}
+    />
+  );
+}
+
 function CounterOwnerTools({ data, access, counter }: { data: DoneWhenData; access: ItemAccess; counter: Counter }) {
-  const add = useAddMeasurements(data, access, counter);
   const reopen = useMutation({ mutationFn: () => data.reopenCounter(access) });
   return (
     <section className="section owner-tools" aria-labelledby="owner-heading">
@@ -203,21 +245,9 @@ function CounterOwnerTools({ data, access, counter }: { data: DoneWhenData; acce
         </div>
       ) : null}
       <details className="more">
-        <summary>Add several measurements</summary>
+        <summary>Import measurements</summary>
         <div className="more__body">
-          <CsvImportForm
-            pending={add.isPending}
-            error={add.error}
-            onSubmit={(rows, onSaved) => {
-              add.mutate(rows, { onSuccess: onSaved });
-            }}
-          />
-          {add.data ? (
-            <p role="status" className="small">
-              Added {add.data.accepted}
-              {add.data.rejected > 0 ? `; ${add.data.rejected} could not be added` : ""}.
-            </p>
-          ) : null}
+          <MeasurementImport data={data} access={access} counter={counter} />
         </div>
       </details>
       <details className="more">

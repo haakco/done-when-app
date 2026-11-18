@@ -59,6 +59,28 @@ describe("Done When data over the Custd SDK", () => {
     expect((await counterRead(items, created.ownerToken)).status).toBe("active");
   });
 
+  it("reports the batches that landed when a later batch is refused", async () => {
+    const { data } = setUp({ maxMeasurements: 1500 });
+    const created = await data.createCounter(DRAFT, FORECAST);
+    const rows = Array.from({ length: 2000 }, (_, index) => ({ measuredAt: new Date(Date.UTC(2026, 10, 2) + index * 60_000).toISOString(), value: index }));
+    const added = await data.addMeasurements(created.ownerToken, rows, FORECAST, 2001);
+    expect(added.accepted).toBe(1000);
+    expect(explainError(added.failure)).toMatch(/counter is full/);
+  });
+
+  it("imports dated estimates in order and reads a dashboard for its download", async () => {
+    const { data } = setUp();
+    const project = await data.createProject({ name: "Kitchen", definitionOfDone: "Done", deliveryTarget: "2027-01-15T00:00:00Z", expiresAfterSeconds: 604800 });
+    const outcome = await data.importEstimates(project.ownerToken, [
+      { estimatedAt: "2026-11-01T00:00:00.000Z", low: "2026-12-10T00:00:00.000Z", high: "2027-03-01T00:00:00.000Z", note: "first" },
+      { estimatedAt: null, low: "2027-01-02T00:00:00.000Z", high: "2027-01-28T00:00:00.000Z", note: "" },
+    ]);
+    expect(outcome).toEqual({ landed: 2, refused: 0, failure: null });
+    const dashboard = await data.createDashboard({ entryRefs: [project.shareToken], expiresAfterSeconds: 604800 });
+    const rows = await data.dashboardRows(dashboard.ownerToken, [{ entryUuid: "e", itemUuid: project.itemUuid }]);
+    expect(rows).toMatchObject([{ name: "Kitchen", kind: "project", status: "active", headline: "Likely Jan 2, 2027 – Jan 28, 2027" }]);
+  });
+
   it("refuses writes through a share link with a plain message", async () => {
     const { data } = setUp();
     const created = await data.createCounter(DRAFT, FORECAST);

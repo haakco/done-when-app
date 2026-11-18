@@ -2,6 +2,8 @@ import { ConvergenceStory } from "@haakco/custd-react";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { AlertsPanel } from "../components/AlertsPanel";
+import { DownloadMenu } from "../components/DownloadMenu";
+import { ImportPanel } from "../components/ImportPanel";
 import { Field } from "../components/Field";
 import { ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
@@ -11,6 +13,8 @@ import { StatusBadge } from "../components/StatusBadge";
 import type { DoneWhenData, EstimateDraft, ItemAccess, Project } from "../data";
 import { projectOf } from "../data/live";
 import { dateInputToRfc3339, formatDate, formatShortDate, rfc3339ToDateInput, todayDateInput } from "../lib/dates";
+import { projectWorkbook } from "../lib/exports";
+import { parseEstimateTable } from "../lib/imports";
 import { useNarrow } from "../lib/use-narrow";
 import { projectSummary } from "../lib/forecast-text";
 import type { ItemViewProps } from "./view-props";
@@ -25,7 +29,15 @@ export function ProjectView({ data, access, read, live, showOwnerTools, ownerRou
   const stale = project.status === "active" && project.latest !== null && project.latest.ageDays > STALE_AFTER_DAYS;
   return (
     <article aria-labelledby="item-name" className="item">
-      <ItemHeader data={data} access={access} kind="project" meta={project} title={project.name} owner={showOwnerTools}>
+      <ItemHeader
+        data={data}
+        access={access}
+        kind="project"
+        meta={project}
+        title={project.name}
+        owner={showOwnerTools}
+        actions={<DownloadMenu name={project.name} build={() => projectWorkbook(project, new Date())} />}
+      >
         <StatusBadge status={project.status} />
         {stale && project.latest ? <StatusBadge status="stale" label={`Estimate is ${Math.floor(project.latest.ageDays)} days old`} /> : null}
       </ItemHeader>
@@ -161,6 +173,18 @@ function ProjectOwnerTools({ data, access, project }: { data: DoneWhenData; acce
               </div>
               <WriteError error={saveTarget.error} />
             </form>
+          </details>
+          <details className="more">
+            <summary>Import estimates</summary>
+            <div className="more__body">
+              <ImportPanel
+                what="estimates"
+                hint="Columns: date recorded, low, high and an optional note. A blank date records it as now."
+                placeholder={"date,low,high,note\n2026-11-01,2026-12-10,2027-03-01,First guess"}
+                parse={parseEstimateTable}
+                onImport={(estimates) => data.importEstimates(access, estimates)}
+              />
+            </div>
           </details>
           <details className="more">
             <summary>Finish or cancel</summary>

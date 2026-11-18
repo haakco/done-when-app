@@ -27,6 +27,7 @@ describe("summaries", () => {
     deadline: "2026-12-01T00:00:00Z",
     status: "active",
     measurements: [],
+    measurementsTruncated: false,
     startValue: 0,
     latestValue: 0,
     forecast: null,

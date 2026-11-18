@@ -52,6 +52,8 @@ export type Counter = ItemMeta & {
   deadline: string | null;
   status: CounterStatus;
   measurements: Measurement[];
+  /** Custd's read holds the newest measurements only; older ones exist but are not listed. */
+  measurementsTruncated: boolean;
   /** The first measurement's value, or 0 before there is one. */
   startValue: number;
   latestValue: number;
@@ -127,11 +129,17 @@ export type DashboardDraft = { entryRefs: string[]; expiresAfterSeconds: number 
 
 export type EstimateDraft = { low: string; high: string; note: string };
 
+/** An imported estimate: `estimatedAt` null records it as made now. */
+export type EstimateImport = EstimateDraft & { estimatedAt: string | null };
+
+/** How much of an import landed; `failure` is the error that stopped it part way, if any. */
+export type ImportOutcome = { landed: number; refused: number; failure: unknown };
+
 export type CreatedItem = { kind: ItemKind; itemUuid: string; ownerToken: string; shareToken: string };
 
 export type ForecastSettings = { method: ForecastMethod; forecastFrom: string | null };
 
-export type MeasurementsAdded = { accepted: number; rejected: number; targetReached: boolean };
+export type MeasurementsAdded = { accepted: number; rejected: number; targetReached: boolean; failure: unknown };
 
 /** "item" is a counter or a project: Custd's list does not say which until the item is read. */
 export type MyItem = { itemUuid: string; kind: "item" | "model" | "dashboard"; name: string; status: string; updatedAt: string };

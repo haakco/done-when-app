@@ -77,7 +77,8 @@ const json = (status: number, body: unknown, extra: Record<string, string> = {})
   body: JSON.stringify(body),
 });
 
-export type FakeCustdOptions = { origin: string; signedInUsersHaveVerifiedEmail?: boolean };
+/** `maxMeasurements` is the per-item cap; Custd's is 20,000. */
+export type FakeCustdOptions = { origin: string; signedInUsersHaveVerifiedEmail?: boolean; maxMeasurements?: number };
 
 export class FakeCustd {
   private readonly items = new Map<string, Stored>();
@@ -409,6 +410,7 @@ export class FakeCustd {
   private measure(caller: Caller, rows: { observedAt: string; value: number }[]): AppMeasurementBulkResponse {
     const item = this.owner(caller);
     const project = this.projectOf(item);
+    if (item.observations.length + rows.length > (this.options.maxMeasurements ?? 20_000)) throw new Problem(422, "app_item_measurement_limit");
     item.observations.push(...rows.map((row) => ({ observedAt: row.observedAt, value: row.value })));
     const response: AppMeasurementBulkResponse = {
       importId: crypto.randomUUID(),

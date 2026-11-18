@@ -35,6 +35,8 @@ const TARGET_CODE = "done";
 const COMPLETED = "completed";
 const CANCELED = "canceled";
 const DAY_MS = 86_400_000;
+/** The forecast story lists at most this many of the newest measurements. */
+export const STORY_MEASUREMENT_LIMIT = 500;
 
 export const DEFAULT_FORECAST_METHOD: ForecastMethod = APP_FORECAST_METHODS.bayesianLinearRegression;
 
@@ -74,6 +76,7 @@ export function toCounter(
   read: AppItemRead,
   observations: readonly { observedAt: string; value: number }[],
   run: AppForecastRun | null,
+  storyTruncated = false,
 ): Counter {
   const project = projectOf(read);
   const measurements = observations
@@ -88,6 +91,7 @@ export function toCounter(
     deadline: project.target?.targetDate ?? null,
     status: project.target?.state === COMPLETED || project.status === COMPLETED ? "completed" : "active",
     measurements,
+    measurementsTruncated: storyTruncated && measurements.length >= STORY_MEASUREMENT_LIMIT,
     startValue: measurements[0]?.value ?? 0,
     latestValue: measurements.at(-1)?.value ?? 0,
     forecast: run ? toForecast(run) : null,

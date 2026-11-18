@@ -56,7 +56,7 @@ export function useCounter(access: ItemAccess, read: AppItemRead, options: Optio
       if (story.status === APP_LIVE_STATUSES.error || story.status === APP_LIVE_STATUSES.offline) return { status: "error", error: story.error };
       return { status: "loading" };
     }
-    const counter = toCounter(read, storyData.observations ?? [], forecastData ?? null);
+    const counter = toCounter(read, storyData.observations ?? [], forecastData ?? null, storyData.truncated);
     const refresh = () => {
       story.refresh();
       forecast.refresh();

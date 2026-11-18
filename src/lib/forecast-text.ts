@@ -1,3 +1,4 @@
+import type { AppModelRun } from "@haakco/custd-sdk/browser";
 import { FORECAST_MIN_MEASUREMENTS } from "../data/source";
 import type { Counter, Project } from "../data/types";
 import { formatDate } from "./dates";
@@ -67,4 +68,12 @@ export function percent(fraction: number): string {
 
 function unitText(unit: string): string {
   return unit ? ` ${unit}` : "";
+}
+
+/** A model's first output as one line, e.g. "total: about 22.5 (90%: 15 – 30)". */
+export function modelHeadline(output: string | undefined, run: AppModelRun | null): string {
+  const summary = output ? run?.quantities?.find((result) => result.name === output)?.summary : undefined;
+  if (!summary || !output) return "No results yet";
+  const number = (value: number) => value.toLocaleString("en", { maximumSignificantDigits: 3 });
+  return `${output}: about ${number(summary.percentiles.p50)} (90%: ${number(summary.percentiles.p5)} – ${number(summary.percentiles.p95)})`;
 }

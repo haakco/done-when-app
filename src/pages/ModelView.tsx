@@ -1,6 +1,9 @@
 import { MeasureNextPanel, ModelCalculator, ModelEditor, QuantityHistogram, SensitivityView } from "@haakco/custd-react";
 import { APP_MODEL_QUANTITY_KINDS, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { DownloadMenu } from "../components/DownloadMenu";
+import { ImportPanel } from "../components/ImportPanel";
 import { ItemHeader } from "../components/ItemHeader";
 import { Loading, ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
@@ -8,6 +11,9 @@ import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
 import type { DoneWhenData, ItemAccess, Model } from "../data";
 import { modelOf, useModelRun } from "../data/live";
 import { formatDate } from "../lib/dates";
+import { modelWorkbook } from "../lib/exports";
+import { mergeQuantities, parseQuantityTable } from "../lib/imports";
+import type { Table } from "../lib/table";
 import type { ItemViewProps } from "./view-props";
 
 /** Formula quantities are the model's outputs; the rest are inputs. */
@@ -25,7 +31,15 @@ export function ModelView({ data, access, read, live, showOwnerTools, ownerRoute
   const outputs = modelOutputs(model);
   return (
     <article aria-labelledby="item-name" className="item">
-      <ItemHeader data={data} access={access} kind="model" meta={model} title={model.name} owner={showOwnerTools}>
+      <ItemHeader
+        data={data}
+        access={access}
+        kind="model"
+        meta={model}
+        title={model.name}
+        owner={showOwnerTools}
+        actions={<DownloadMenu name={model.name} build={() => modelWorkbook(model, run.status === "ready" ? run.data : null, new Date())} />}
+      >
         <span className="small muted">{model.latestVersion > 0 ? `Version ${model.latestVersion}` : "No quantities yet"}</span>
       </ItemHeader>
       {model.description ? <p className="lede">{model.description}</p> : null}
@@ -139,6 +153,12 @@ function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: 
         </div>
       </details>
       <details className="more">
+        <summary>Import quantities</summary>
+        <div className="more__body">
+          <QuantityImport data={data} access={access} model={model} />
+        </div>
+      </details>
+      <details className="more">
         <summary>Links, expiry and my items</summary>
         <div className="more__body">
           <KeepInMyItems data={data} access={access} kind="model" meta={model} />
@@ -146,5 +166,22 @@ function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: 
         </div>
       </details>
     </section>
+  );
+}
+
+function QuantityImport({ data, access, model }: { data: DoneWhenData; access: ItemAccess; model: Model }) {
+  const existing = model.version?.quantities;
+  const parse = useCallback((table: Table) => parseQuantityTable(table, existing ?? []), [existing]);
+  return (
+    <ImportPanel
+      what="quantities"
+      hint="Columns: name, value, unit and description. Value is a number, 5 to 10, 3 of 10 or =formula. Rows replace quantities with the same name and add the rest, as a new version."
+      placeholder={"name,value,unit,description\nhours,5 to 10,h,\nrate,40,$/h,\ntotal,=hours * rate,$,"}
+      parse={parse}
+      onImport={async (quantities) => {
+        await data.saveModelVersion(access, { quantities: mergeQuantities(existing ?? [], quantities), note: `Imported ${quantities.length} quantities` });
+        return { landed: quantities.length, refused: 0, failure: null };
+      }}
+    />
   );
 }
