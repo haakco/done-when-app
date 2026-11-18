@@ -14,7 +14,12 @@ test("import a CSV with a bad row into a counter, then download it as Excel and 
   await page.getByRole("button", { name: "Import 2 good measurements, skip 1" }).click();
   await expect(page.getByText("Imported 2 measurements.")).toBeVisible();
 
-  await page.locator("summary", { hasText: "Download" }).click();
+  const menu = page.locator("summary", { hasText: "Download" });
+  await menu.click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Excel (.xlsx)" })).toBeHidden();
+  await expect(menu).toBeFocused();
+  await menu.click();
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Excel (.xlsx)" }).click()]);
   expect(download.suggestedFilename()).toMatch(/^steps-taken-\d{4}-\d{2}-\d{2}\.xlsx$/);
   const path = await download.path();

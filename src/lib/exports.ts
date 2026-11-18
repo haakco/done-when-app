@@ -48,7 +48,7 @@ export function counterWorkbook(counter: Counter, now: Date): Workbook {
       { name: "Measurements", columns: [datetime("Time"), number("Value")], rows: counter.measurements.map((row) => [new Date(row.measuredAt), row.value]) },
       {
         name: "Forecast",
-        columns: [text("Method", 28), date("Forecast from"), date("Completion p5"), date("Completion p50"), date("Completion p95"), { header: "Deadline probability", kind: "percent", width: 20 }, number("Rate per day"), number("Measurements used", 18), datetime("Generated at")],
+        columns: [text("Method", 28), date("Forecast from"), date("Completion p5"), date("Completion p50"), date("Completion p95"), { header: "Deadline probability", kind: "percent", width: 20 }, number("Observed rate per day", 20), number("Measurements used", 18), datetime("Generated at")],
         rows: forecastRows,
       },
       summarySheet([

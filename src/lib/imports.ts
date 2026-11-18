@@ -4,7 +4,7 @@
 import { formatModelValue, parseModelValue, type ModelValue } from "@haakco/custd-react";
 import { APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, APP_MODEL_RANGE_DISTRIBUTIONS, type AppModelQuantity, type AppModelRangeDistribution } from "@haakco/custd-sdk/browser";
 import type { EstimateImport, Measurement } from "../data/types";
-import { dayOrderOf, readDate, readNumber, textOf, type DayOrder } from "./cells";
+import { dayOrderOf, readDate, readNumber, textOf, usesDecimalComma, type DayOrder } from "./cells";
 import type { CellValue, Table, TableRow } from "./table";
 
 /** Custd keeps at most this many measurements per counter. */
@@ -88,12 +88,13 @@ const MEASUREMENT_COLUMNS: ColumnSpec[] = [
 export function parseMeasurementTable(table: Table): ImportPlan<Measurement> {
   const located = locate(table, MEASUREMENT_COLUMNS, startsWithText);
   const order = dayOrderOf(located.rows.map((row) => cellOf(row, located, "time")));
+  const decimalComma = usesDecimalComma(table, located.rows.map((row) => cellOf(row, located, "value")));
   const rows = located.rows.map((row): ImportRow<Measurement> => {
     const countError = located.positional ? columnCountError(row, MEASUREMENT_COLUMNS) : null;
     if (countError) return failed(row, countError);
     const time = readDate(cellOf(row, located, "time"), order);
     if (!time.ok) return failed(row, time.message);
-    const value = readNumber(cellOf(row, located, "value"), table.decimalComma);
+    const value = readNumber(cellOf(row, located, "value"), decimalComma);
     if (!value.ok) return failed(row, value.message);
     return { line: row.line, cells: [previewTime(time.value), String(value.value)], value: { measuredAt: time.value.toISOString(), value: value.value }, error: null };
   });

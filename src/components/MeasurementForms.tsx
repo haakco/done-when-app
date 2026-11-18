@@ -46,7 +46,7 @@ export function CsvField({ text, onText, rowErrors, label = "Measurements" }: Cs
   const summary = rowErrors.length > 0 ? `${rowErrors.length} row${rowErrors.length === 1 ? "" : "s"} need fixing; nothing was added.` : null;
   return (
     <>
-      <Field label={label} hint="One row per line: date or time, then the value, e.g. 2026-11-01,12. A header row is fine." error={summary}>
+      <Field label={label} hint="One row per line: date or time, then the value, e.g. 2026-11-01,12. A header row is fine; times without a zone are UTC." error={summary}>
         {(control) => (
           <textarea {...control} value={text} placeholder={"2026-11-01T09:00:00Z,12\n2026-11-02T09:00:00Z,15"} onChange={(event) => { onText(event.target.value); }} />
         )}

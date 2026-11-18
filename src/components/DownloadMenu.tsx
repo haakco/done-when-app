@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { explainError } from "../data";
 import { exportFileName, workbookCsv, type Workbook } from "../lib/exports";
 import { saveFile, writeXlsx } from "../lib/xlsx";
@@ -19,6 +19,18 @@ export function DownloadMenu({ name, build, note = null }: DownloadMenuProps) {
   const menu = useRef<HTMLDetailsElement>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ text: string; failed: boolean } | null>(null);
+  useEffect(() => {
+    const details = menu.current;
+    if (!details) return;
+    // Escape closes the menu and returns focus to "Download", like other menus.
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !details.open) return;
+      details.open = false;
+      details.querySelector("summary")?.focus();
+    };
+    details.addEventListener("keydown", close);
+    return () => { details.removeEventListener("keydown", close); };
+  }, []);
   const download = async (format: Format) => {
     setBusy(true);
     setStatus(null);

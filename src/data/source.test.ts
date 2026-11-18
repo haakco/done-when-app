@@ -64,6 +64,7 @@ describe("Done When data over the Custd SDK", () => {
     const added = await data.addMeasurements(created.ownerToken, rows, FORECAST, 2001);
     expect(added.accepted).toBe(1000);
     expect(explainError(added.failure)).toMatch(/counter is full/);
+    expect((await data.createCounter({ ...DRAFT, history: rows }, FORECAST)).rejected).toBe(1000);
   });
 
   it("imports dated estimates in order and reads a dashboard for its download", async () => {

@@ -34,6 +34,11 @@ describe("parseMeasurementTable", () => {
     expect(plan.problem).toBeNull();
   });
 
+  it("keeps dot decimals in a ; file whose numbers have no commas", () => {
+    expect(parseMeasurementTable(parseCsvTable("time;value\n2026-11-01;1.250\n2026-11-02;2.5")).good.map((row) => row.value)).toEqual([1.25, 2.5]);
+    expect(parseMeasurementTable(parseCsvTable("time;value\n2026-11-01;1.250\n2026-11-02;2,5")).good.map((row) => row.value)).toEqual([1250, 2.5]);
+  });
+
   it("refuses to guess an ambiguous day/month order", () => {
     const plan = parseMeasurementTable(parseCsvTable("time,value\n03/04/2026,1"));
     expect(errorsOf(plan)).toEqual([{ line: 2, message: "“03/04/2026” could be day/month or month/day; write it as yyyy-mm-dd" }]);

@@ -20,7 +20,7 @@ It should feel personal and a little playful, never like an operations console.
 
 - One centred column, `--width-page` wide, generous spacing. Item pages start with the title and
   one Share button beside it (it copies the view-only link; owners never share their owner
-  link), then a one-time "Save your owner link" notice for the owner, then one summary card:
+  link) and the Download menu, then a one-time "Save your owner link" notice for the owner, then one summary card:
   the answer as a headline ("Likely done Nov 19"), one detail line, progress and pace. Then the
   owner's one common write (add a measurement or an estimate), then the chart and the live line.
 - Item kinds: counter, project, model and dashboard share this page shape, the home page's

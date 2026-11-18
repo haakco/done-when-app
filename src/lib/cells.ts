@@ -1,6 +1,6 @@
 // Reads dates and numbers out of imported cells, accepting what spreadsheets commonly write.
 
-import { unguardFormula, type CellValue } from "./table";
+import { unguardFormula, type CellValue, type Table } from "./table";
 
 /** How a file writes `03/04/2026`: decided once per file from the dates it holds. */
 export type DayOrder = "day-first" | "month-first" | "unknown" | "mixed";
@@ -78,7 +78,15 @@ function notDate(text: string): CellRead<Date> {
   return { ok: false, message: `“${text}” is not a date` };
 }
 
-/** Numbers, with thousands separators, and decimal commas in `;`-separated files. */
+/**
+ * Whether a column of a `;`-separated file writes `12,5` for twelve and a half. Only then is a dot
+ * a thousands separator; a column with no commas keeps dots as decimals.
+ */
+export function usesDecimalComma(table: Table, cells: readonly (CellValue | undefined)[]): boolean {
+  return table.decimalComma && cells.some((cell) => typeof cell === "string" && cell.includes(","));
+}
+
+/** Numbers, with thousands separators, and decimal commas when `decimalComma` says so. */
 export function readNumber(cell: CellValue | undefined, decimalComma: boolean): CellRead<number> {
   if (typeof cell === "number") return Number.isFinite(cell) ? { ok: true, value: cell } : { ok: false, message: "the number is not finite" };
   const text = textOf(cell);

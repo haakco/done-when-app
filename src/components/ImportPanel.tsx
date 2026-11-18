@@ -84,7 +84,7 @@ export function ImportPanel<T>({ what, hint, placeholder, parse, check, onImport
       <WriteError error={send.error} />
       {plan && problem === null && plan.good.length > 0 ? (
         <div className="button-row">
-          <button type="button" className="button button--primary" disabled={send.isPending} onClick={() => { send.mutate(plan.good, { onSuccess: reset }); }}>
+          <button type="button" className="button button--primary" disabled={send.isPending} onClick={() => { send.mutate(plan.good, { onSuccess: (outcome) => { if (outcome.failure === null) reset(); } }); }}>
             {send.isPending ? "Importing…" : importLabel(plan, what)}
           </button>
         </div>

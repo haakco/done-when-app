@@ -584,4 +584,6 @@ pre.code {
 .import__preview h3, .import__preview p { margin: 0; }
 .import__errors { margin: 0; padding-left: var(--space-6); }
 .import__table th { text-align: left; padding: var(--space-2); border-bottom: var(--border); }
+.import__table td { white-space: nowrap; }
+.import__table td:last-child { white-space: normal; min-width: 10rem; }
 .import__bad td { color: var(--color-stop); }

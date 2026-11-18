@@ -124,7 +124,8 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
       const rows = draft.history.length > 0 ? draft.history : [{ measuredAt: draft.startedAt, value: draft.startValue }];
       const added = await addRows(result.ownerToken, rows);
       if (added.accepted >= FORECAST_MIN_MEASUREMENTS) await runForecast(result.ownerToken, forecast);
-      return { ...created("counter", result), rejected: added.rejected };
+      // Rows a stopped batch never sent count as not accepted, so the page says to add them again.
+      return { ...created("counter", result), rejected: rows.length - added.accepted };
     },
     async addMeasurements(owner, rows, forecast, totalAfter) {
       const added = await addRows(owner, rows);
