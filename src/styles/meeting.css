@@ -1,0 +1,79 @@
+/* Meeting pages: the agenda builder, the live "now" card and the agenda. Tokens only. */
+
+.agenda-builder { border: 0; padding: 0; margin: 0; display: grid; gap: var(--space-3); min-width: 0; }
+.agenda-builder > legend { font-weight: 600; padding: 0; margin-bottom: var(--space-2); }
+.agenda-builder__rows { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-3); }
+
+.agenda-builder__row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) 6rem auto;
+  align-items: end;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+}
+
+.agenda-builder__number {
+  align-self: center;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--color-ink-muted);
+  text-align: center;
+}
+
+.agenda-builder__tools { display: flex; gap: var(--space-1); }
+.agenda-builder__tool { min-width: 2.75rem; justify-content: center; padding-inline: var(--space-2); }
+.agenda-builder__error { grid-column: 2 / -1; }
+.agenda-builder__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.agenda-builder__total { margin: 0; font-size: var(--text-lg); }
+
+@media (max-width: 34rem) {
+  .agenda-builder__row { grid-template-columns: 1.5rem minmax(0, 1fr) 5rem; }
+  .agenda-builder__tools { grid-column: 2 / -1; }
+}
+
+.meeting-now { border-top-color: var(--color-forecast); transition: border-color var(--motion-calm) var(--ease); }
+.meeting-now__label { color: var(--color-ink-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.meeting-now__title { font-family: var(--font-display); font-size: var(--text-2xl); margin: 0; overflow-wrap: anywhere; }
+
+.meeting-now__clock {
+  font-family: var(--font-display);
+  font-size: var(--text-hero);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--color-forecast);
+  transition: color var(--motion-calm) var(--ease);
+}
+
+/* Over time: a calm amber with the word "over" and a "!" — never a flashing red. */
+.meeting-now--over { border-top-color: var(--color-warn); }
+.meeting-now--over .meeting-now__clock { color: var(--color-warn); }
+.meeting-now__steps { margin-top: var(--space-2); }
+.meeting-now__steps .button--big { min-width: 0; max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.meeting-now__confirm p { margin-bottom: var(--space-3); }
+
+.agenda { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-2); }
+
+.agenda__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+}
+
+.agenda__title { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.agenda__time { color: var(--color-ink-muted); }
+.agenda__row--done { background: transparent; }
+.agenda__row--done .agenda__title { color: var(--color-ink-muted); font-weight: 400; }
+.agenda__row--now { border-left: 4px solid var(--color-forecast); }
+.agenda__row--now .agenda__time { color: var(--color-forecast); font-weight: 600; }
+.agenda__was { font-size: var(--text-sm); }
+
+.outcome-table tfoot th,
+.outcome-table tfoot td { font-weight: 700; border-bottom: 0; }

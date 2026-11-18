@@ -1,7 +1,7 @@
 import { test as base, type BrowserContext, type Page } from "@playwright/test";
 import { FAKE_API_PATH, FakeCustd, type FakeCustdOptions } from "./fake-custd";
 
-export const ORIGIN = "http://127.0.0.1:4173";
+export const ORIGIN = `http://127.0.0.1:${process.env.E2E_PORT ?? "4173"}`;
 
 /** Sends the discovery file, Custd API and sign-in requests of a context to the fake. */
 export async function routeToFake(context: BrowserContext, fake: FakeCustd): Promise<void> {

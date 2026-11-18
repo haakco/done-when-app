@@ -2,9 +2,10 @@
 // uses the import's column names, so a downloaded file (Excel or CSV) imports back unchanged.
 
 import { formatModelValue } from "@haakco/custd-react";
-import { APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, type AppModelQuantity, type AppModelRun } from "@haakco/custd-sdk/browser";
+import { APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, type AppMeeting, type AppModelQuantity, type AppModelRun } from "@haakco/custd-sdk/browser";
 import type { Counter, Model, Project } from "../data/types";
 import { counterSummary, projectSummary, type Summary } from "./forecast-text";
+import { meetingOutcome } from "./meeting";
 import { ratePerSecond } from "./rate";
 import { toCsv, type CellValue } from "./table";
 
@@ -124,6 +125,33 @@ export function modelWorkbook(model: Model, run: AppModelRun | null, now: Date):
         ["Last run", asDate(run?.createdAt)],
         ["Simulated trials", run?.sampleCount ?? null],
         ["Sensitivity of", run?.sensitivity?.output ?? ""],
+        ["Exported at", now],
+      ]),
+    ],
+  };
+}
+
+const MINUTE_MS = 60_000;
+const minutes = (ms: number | null): number | null => (ms === null ? null : Math.round((ms / MINUTE_MS) * 100) / 100);
+
+export function meetingWorkbook(meeting: AppMeeting, now: Date): Workbook {
+  const outcome = meetingOutcome(meeting);
+  const ran = meeting.status === "completed" || meeting.status === "cancelled";
+  return {
+    sheets: [
+      {
+        name: "Agenda",
+        columns: [number("Block", 8), text("Title", 32), number("Planned minutes", 16), number("Allocated minutes", 18), number("Actual minutes", 16), number("Difference minutes", 18), text("Status", 12), datetime("Started at"), datetime("Ended at")],
+        rows: outcome.rows.map((row) => [row.block.position, row.block.title, minutes(row.block.predictedMs), minutes(row.block.allocatedMs), minutes(row.actualMs), minutes(row.differenceMs), row.block.status, asDate(row.block.startedAt), asDate(row.block.endedAt)]),
+      },
+      summarySheet([
+        ["Name", meeting.name],
+        ["Status", meeting.status],
+        ["Started at", asDate(meeting.startedAt)],
+        ["Planned end", asDate(meeting.endsAt)],
+        ["Planned minutes", minutes(outcome.predictedMs)],
+        ["Actual minutes", ran ? minutes(outcome.actualMs) : null],
+        ["Outcome", ran ? outcome.sentence : ""],
         ["Exported at", now],
       ]),
     ],

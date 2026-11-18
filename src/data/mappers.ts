@@ -20,6 +20,8 @@ import type {
   ItemKind,
   ItemMeta,
   Measurement,
+  Meeting,
+  MeetingDraft,
   Model,
   ModelDraft,
   Project,
@@ -40,11 +42,12 @@ export const STORY_MEASUREMENT_LIMIT = 500;
 
 export const DEFAULT_FORECAST_METHOD: ForecastMethod = APP_FORECAST_METHODS.bayesianLinearRegression;
 
-export const KIND_PATH: Record<ItemKind, string> = { counter: "c", project: "p", model: "m", dashboard: "d" };
+export const KIND_PATH: Record<ItemKind, string> = { counter: "c", project: "p", model: "m", meeting: "meet", dashboard: "d" };
 
 export function itemKindOf(read: AppItemRead): ItemKind {
   if (read.item.kind === APP_ITEM_KINDS.linkCollection) return "dashboard";
   if (read.item.kind === APP_ITEM_KINDS.uncertaintyModel) return "model";
+  if (read.item.kind === APP_ITEM_KINDS.meeting) return "meeting";
   return read.measurementProject?.series?.[0]?.seriesCode === PROJECT_SERIES_CODE ? "project" : "counter";
 }
 
@@ -178,7 +181,7 @@ export function toModel(read: AppItemRead): Model {
 
 /** The item's display name, whatever its kind. */
 export function itemNameOf(read: AppItemRead): string {
-  return read.measurementProject?.name ?? read.uncertaintyModel?.name ?? "Dashboard";
+  return read.measurementProject?.name ?? read.uncertaintyModel?.name ?? read.meeting?.name ?? "Dashboard";
 }
 
 export function modelCreateRequest(draft: ModelDraft): AppItemCreateRequest {
@@ -186,6 +189,21 @@ export function modelCreateRequest(draft: ModelDraft): AppItemCreateRequest {
     kind: APP_ITEM_KINDS.uncertaintyModel,
     idleExpirySeconds: draft.expiresAfterSeconds,
     uncertaintyModel: { name: draft.name, ...(draft.description ? { description: draft.description } : {}) },
+  };
+}
+
+export function toMeeting(read: AppItemRead): Meeting {
+  if (!read.meeting) throw new Error("item has no meeting");
+  return { ...metaOf(read), meeting: read.meeting };
+}
+
+const MINUTE_MS = 60_000;
+
+export function meetingCreateRequest(draft: MeetingDraft): AppItemCreateRequest {
+  return {
+    kind: APP_ITEM_KINDS.meeting,
+    idleExpirySeconds: draft.expiresAfterSeconds,
+    meeting: { name: draft.name, blocks: draft.blocks.map((block) => ({ title: block.title, predictedMs: Math.round(block.minutes * MINUTE_MS) })) },
   };
 }
 

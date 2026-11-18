@@ -10,10 +10,11 @@ import { rememberRecent } from "../lib/device";
 import { ownerAccessFromHash } from "../lib/links";
 import { CounterView } from "./CounterView";
 import { DashboardView } from "./DashboardView";
+import { MeetingView } from "./MeetingView";
 import { ModelView } from "./ModelView";
 import { ProjectView } from "./ProjectView";
 
-/** `/c/<share token>`, `/p/…`, `/d/…`: the read-only page. */
+/** `/c/<share token>`, `/p/…`, `/m/…`, `/meet/…`, `/d/…`: the read-only page. */
 export function SharePage() {
   const { token = "" } = useParams();
   return <WithData>{({ data }) => <ItemPage data={data} access={token} route="share" />}</WithData>;
@@ -66,5 +67,6 @@ function ItemPage({ data, access, route }: ItemPageProps) {
   if (kind === "dashboard") return <DashboardView {...view} />;
   if (kind === "project") return <ProjectView {...view} />;
   if (kind === "model") return <ModelView {...view} />;
+  if (kind === "meeting") return <MeetingView {...view} />;
   return <CounterView {...view} />;
 }

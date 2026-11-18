@@ -8,6 +8,7 @@ import {
   type AppAlertSubscription,
   type AppAlertWebhookCreated,
   APP_ITEM_KINDS,
+  APP_MEETING_ERROR_CODES,
   AppItemError,
   type AppItemRead,
   type AppItemsClient,
@@ -19,7 +20,7 @@ import { rememberShareToken } from "../lib/device";
 import { tokenFromPaste } from "../lib/links";
 import type { DashboardRow } from "../lib/exports";
 import { dashboardRow } from "./dashboard-export";
-import { counterCreateRequest, modelCreateRequest, projectCreateRequest } from "./mappers";
+import { counterCreateRequest, meetingCreateRequest, modelCreateRequest, projectCreateRequest } from "./mappers";
 import type {
   CounterDraft,
   CreatedItem,
@@ -32,6 +33,7 @@ import type {
   ItemAccess,
   Measurement,
   MeasurementsAdded,
+  MeetingDraft,
   ModelDraft,
   MyItem,
   ProjectDraft,
@@ -69,6 +71,12 @@ export type DoneWhenData = {
   saveModelVersion(owner: ItemAccess, request: AppModelVersionCreateRequest): Promise<void>;
   /** Runs the latest version and stores the run every viewer sees. */
   runModel(owner: ItemAccess, request: Omit<AppModelRunRequest, "seed">): Promise<void>;
+
+  createMeeting(draft: MeetingDraft): Promise<CreatedItem>;
+  startMeeting(owner: ItemAccess): Promise<void>;
+  /** Finishes `blockUuid`, the block on now; a repeat is a no-op, a stale block a 409 the caller can ignore. */
+  advanceMeeting(owner: ItemAccess, blockUuid: string): Promise<void>;
+  endMeeting(owner: ItemAccess): Promise<void>;
 
   createDashboard(draft: DashboardDraft): Promise<CreatedItem>;
   /** One summary per dashboard item, read once for a download. */
@@ -190,6 +198,19 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
       await items.runModel(owner, { ...request, seed: Math.floor(Math.random() * 2 ** 31) });
     },
 
+    async createMeeting(draft) {
+      return created("meeting", await items.createItem(meetingCreateRequest(draft)));
+    },
+    async startMeeting(owner) {
+      await items.startMeeting(owner);
+    },
+    async advanceMeeting(owner, blockUuid) {
+      await items.advanceMeeting(owner, { blockUuid });
+    },
+    async endMeeting(owner) {
+      await items.endMeeting(owner);
+    },
+
     async createDashboard(draft) {
       const result = await items.createItem({ kind: APP_ITEM_KINDS.linkCollection, idleExpirySeconds: draft.expiresAfterSeconds });
       for (const pasted of draft.entryRefs) {
@@ -248,6 +269,7 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
 function myItemKind(kind: string): MyItem["kind"] {
   if (kind === APP_ITEM_KINDS.linkCollection) return "dashboard";
   if (kind === APP_ITEM_KINDS.uncertaintyModel) return "model";
+  if (kind === APP_ITEM_KINDS.meeting) return "meeting";
   return "item";
 }
 
@@ -272,7 +294,7 @@ const PLAIN_ERRORS: Record<string, string> = {
   [APP_ITEM_ERROR_CODES.createLimited]: "Too many new items from here just now. Wait a minute and try again.",
   [APP_ITEM_ERROR_CODES.measurementLimit]: "This counter is full: it cannot take more measurements.",
   [APP_ITEM_ERROR_CODES.collectionFull]: "This dashboard is full. Remove an item to add another.",
-  [APP_ITEM_ERROR_CODES.notCollectable]: "That link cannot go on a dashboard. Paste a counter, project or model link.",
+  [APP_ITEM_ERROR_CODES.notCollectable]: "That link cannot go on a dashboard. Paste a counter, project, model or meeting link.",
   [APP_ITEM_ERROR_CODES.wrongKind]: "That link opens a different kind of item.",
   [APP_ITEM_ERROR_CODES.claimed]: "Someone else already keeps this item in their list.",
   [APP_ITEM_ERROR_CODES.userRefused]: "Your sign-in has ended. Sign in again.",
@@ -300,6 +322,11 @@ export function explainError(error: unknown): string {
     if (error.status === 429) return "Too many requests just now. Wait a moment and try again.";
   }
   return "Something went wrong. Try again in a moment.";
+}
+
+/** Custd refused a meeting step because this page's view is behind; the live read catches up by itself. */
+export function isStaleMeetingStep(error: unknown): boolean {
+  return error instanceof AppItemError && error.code === APP_MEETING_ERROR_CODES.stepRefused;
 }
 
 /** The link is gone for good: expired, revoked or never existed. */

@@ -4,7 +4,8 @@
 import { APP_ITEM_ERROR_CODES, APP_MODEL_ERROR_CODES, APP_MODEL_QUANTITY_KINDS, AppItemError, type AppConditionalRead, type AppItemAccess, type AppItemsClient } from "@haakco/custd-sdk/browser";
 import type { DashboardRow } from "../lib/exports";
 import { counterSummary, modelHeadline, projectSummary } from "../lib/forecast-text";
-import { itemKindOf, toCounter, toModel, toProject } from "./mappers";
+import { meetingLine } from "../lib/meeting";
+import { itemKindOf, toCounter, toMeeting, toModel, toProject } from "./mappers";
 import { explainError } from "./source";
 
 function dataOf<T>(read: AppConditionalRead<T>): T {
@@ -32,6 +33,11 @@ export async function dashboardRow(items: AppItemsClient, access: AppItemAccess,
       const project = toProject(read);
       const summary = projectSummary(project);
       return { name: project.name, kind, status: project.status, headline: summary.headline, detail: summary.detail ?? "", updatedAt };
+    }
+    if (kind === "meeting") {
+      const { meeting } = toMeeting(read);
+      const line = meetingLine(meeting, Date.now());
+      return { name: meeting.name, kind, status: meeting.status, headline: line.headline, detail: line.detail ?? "", updatedAt };
     }
     if (kind === "model") {
       const model = toModel(read);

@@ -4,8 +4,8 @@
 import { APP_LIVE_STATUSES, type AppItemError, type AppItemRead, type AppModelRun } from "@haakco/custd-sdk/browser";
 import { CUSTD_APP_LIVE_IDLE, type CustdAppLiveResult, useAppForecast, useAppForecastStory, useAppItem, useAppModelRun } from "@haakco/custd-react";
 import { useMemo } from "react";
-import { toCounter, toDashboard, toModel, toProject } from "./mappers";
-import type { Counter, Dashboard, ItemAccess, Model, Project } from "./types";
+import { toCounter, toDashboard, toMeeting, toModel, toProject } from "./mappers";
+import type { Counter, Dashboard, ItemAccess, Meeting, Model, Project } from "./types";
 
 /** How fresh what is on screen is, worst first: the page shows one line for it. */
 export type Freshness = "fresh" | "stale" | "offline";
@@ -72,6 +72,10 @@ export function projectOf(read: AppItemRead): Project {
 
 export function dashboardOf(read: AppItemRead): Dashboard {
   return toDashboard(read);
+}
+
+export function meetingOf(read: AppItemRead): Meeting {
+  return toMeeting(read);
 }
 
 export function modelOf(read: AppItemRead): Model {

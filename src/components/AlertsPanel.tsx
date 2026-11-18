@@ -13,6 +13,7 @@ const RULE_CHOICES: Record<ItemKind, AppAlertRuleType[]> = {
   counter: [APP_ALERT_RULE_TYPES.targetReached, APP_ALERT_RULE_TYPES.deadlineProbabilityBelow, APP_ALERT_RULE_TYPES.forecastMovedInsideTarget],
   project: [APP_ALERT_RULE_TYPES.estimateStale],
   model: [],
+  meeting: [],
   dashboard: [],
 };
 

@@ -14,6 +14,8 @@ import type {
   AppItemSummary,
   AppLinkCollectionEntry,
   AppMeasurementBulkResponse,
+  AppMeeting,
+  AppMeetingBlock,
   AppMeasurementProject,
   AppModelQuantity,
   AppModelQuantityResult,
@@ -47,6 +49,7 @@ type Stored = {
   ownerUser: string | null;
   project?: AppMeasurementProject;
   model?: AppUncertaintyModel;
+  meeting?: AppMeeting & { lastFinished: string | null };
   modelRuns: AppModelRun[];
   observations: { observedAt: string; value: number }[];
   estimates: AppProjectEstimate[];
@@ -87,6 +90,8 @@ export class FakeCustd {
   private userCount = 0;
   /** Every request the fake answered, for assertions such as "no token in a URL". */
   readonly requests: FakeRequest[] = [];
+  /** How far `advanceClock` has moved the fake's meeting clock past the real one. */
+  private clockOffsetMs = 0;
 
   constructor(private readonly options: FakeCustdOptions) {}
 
@@ -108,6 +113,15 @@ export class FakeCustd {
         redirectUri: `${origin}/auth/callback`,
       },
     };
+  }
+
+  /** Moves the meeting clock on, as the browser clock is moved with `page.clock.fastForward`. */
+  advanceClock(ms: number): void {
+    this.clockOffsetMs += ms;
+  }
+
+  private now(): number {
+    return Date.now() + this.clockOffsetMs;
   }
 
   handle(request: FakeRequest): FakeResponse {
@@ -187,6 +201,12 @@ export class FakeCustd {
         if (!run) throw new Problem(404, "app_model_run_missing");
         return this.conditional(request, `"model-run-${caller.item.modelRuns.length}"`, () => run);
       }
+      case "POST /api/v1/app/item/meeting/start":
+        return json(200, this.change(caller, () => { this.startMeeting(caller.item); }));
+      case "POST /api/v1/app/item/meeting/advance":
+        return json(200, this.advanceMeeting(caller, body.blockUuid as string));
+      case "POST /api/v1/app/item/meeting/end":
+        return json(200, this.change(caller, () => { this.endMeeting(caller.item); }));
       case "GET /api/v1/app/item/alerts":
         return json(200, this.alertSettings(this.owner(caller)));
       case "GET /api/v1/app/item/alerts/deliveries":
@@ -291,6 +311,12 @@ export class FakeCustd {
       item.model = { modelUuid: crypto.randomUUID(), name: create.name, description: create.description ?? "", latestVersion: 0, createdAt: now, updatedAt: now };
       if (create.quantities) this.saveVersion(item, create.quantities, create.note ?? "");
     }
+    if (request.kind === "meeting") {
+      const blocks = request.meeting.blocks.map(
+        (block, index): AppMeetingBlock => ({ blockUuid: crypto.randomUUID(), position: index + 1, title: block.title, status: "pending", predictedMs: block.predictedMs, allocatedMs: block.predictedMs, actualMs: 0 }),
+      );
+      item.meeting = { name: request.meeting.name, status: "ready", blocks, summary: emptySummary(), lastFinished: null };
+    }
     if (request.kind === "measurement_project") {
       const create = request.measurementProject;
       item.project = {
@@ -356,6 +382,7 @@ export class FakeCustd {
     }
     if (item.kind === "link_collection") read.linkCollection = { entries: item.entries };
     if (item.model) read.uncertaintyModel = structuredClone(item.model);
+    if (item.meeting) read.meeting = meetingRead(item.meeting);
     return read;
   }
 
@@ -365,7 +392,7 @@ export class FakeCustd {
       .filter((item) => item.ownerUser === user)
       .map((item) => {
         const read = this.read({ item, role: "owner", user, viaCollection: false });
-        return { ...read.item, name: item.project?.name ?? item.model?.name ?? "", status: item.project?.status ?? "" };
+        return { ...read.item, name: item.project?.name ?? item.model?.name ?? item.meeting?.name ?? "", status: item.project?.status ?? item.meeting?.status ?? "" };
       });
   }
 
@@ -464,7 +491,9 @@ export class FakeCustd {
     const link = this.links.get(token);
     const target = link ? this.items.get(link.itemUuid) : undefined;
     if (!target) throw new Problem(404, "app_item_not_found");
-    if (target.kind !== "measurement_project" && target.kind !== "uncertainty_model") throw new Problem(422, "app_item_not_collectable");
+    // Meetings are collectable here so the dashboard tile can be proven; Custd's applinks registry
+    // does not mark them collectable yet (KindMeeting in libs/go/applinks/kinds.go).
+    if (target.kind === "link_collection") throw new Problem(422, "app_item_not_collectable");
     const entry: AppLinkCollectionEntry = {
       entryUuid: crypto.randomUUID(),
       itemUuid: target.uuid,
@@ -634,6 +663,70 @@ export class FakeCustd {
     return run;
   }
 
+  // ---- Meetings: Custd's run engine in small; an overrun shrinks later blocks in proportion ----
+
+  private meetingOf(item: Stored): AppMeeting & { lastFinished: string | null } {
+    if (!item.meeting) throw new Problem(409, "app_item_wrong_kind");
+    return item.meeting;
+  }
+
+  private startMeeting(item: Stored): void {
+    const meeting = this.meetingOf(item);
+    if (meeting.status !== "ready") throw new Problem(409, "app_item_meeting_step_refused");
+    const now = this.now();
+    const blocks = meeting.blocks ?? [];
+    meeting.status = "running";
+    meeting.startedAt = iso(now);
+    meeting.endsAt = iso(now + blocks.reduce((sum, block) => sum + block.predictedMs, 0));
+    const first = blocks[0];
+    if (!first) return;
+    Object.assign(first, { status: "active", startedAt: iso(now) });
+    meeting.currentBlockUuid = first.blockUuid;
+  }
+
+  private advanceMeeting(caller: Caller, blockUuid: string): AppItemRead {
+    const meeting = this.meetingOf(this.owner(caller));
+    if (blockUuid === meeting.lastFinished) return this.read(caller);
+    if (meeting.status !== "running" || blockUuid !== meeting.currentBlockUuid) throw new Problem(409, "app_item_meeting_step_refused");
+    return this.change(caller, () => {
+      const now = this.finishCurrent(meeting);
+      const next = (meeting.blocks ?? []).find((block) => block.status === "pending" && block.allocatedMs > 0);
+      if (next && now < Date.parse(meeting.endsAt ?? "")) {
+        Object.assign(next, { status: "active", startedAt: iso(now) });
+        meeting.currentBlockUuid = next.blockUuid;
+      } else this.closeMeeting(meeting);
+    });
+  }
+
+  private endMeeting(item: Stored): void {
+    const meeting = this.meetingOf(item);
+    if (meeting.status !== "running") throw new Problem(409, "app_item_meeting_step_refused");
+    this.finishCurrent(meeting);
+    this.closeMeeting(meeting);
+  }
+
+  private finishCurrent(meeting: AppMeeting & { lastFinished: string | null }): number {
+    const now = this.now();
+    const blocks = meeting.blocks ?? [];
+    const active = blocks.find((block) => block.blockUuid === meeting.currentBlockUuid);
+    if (active) {
+      Object.assign(active, { status: "completed", endedAt: iso(now), actualMs: now - Date.parse(active.startedAt ?? iso(now)) });
+      meeting.lastFinished = active.blockUuid;
+    }
+    const pending = blocks.filter((block) => block.status === "pending");
+    const total = pending.reduce((sum, block) => sum + block.allocatedMs, 0);
+    const budget = Math.max(0, Date.parse(meeting.endsAt ?? "") - now);
+    for (const block of pending) block.allocatedMs = total === 0 ? 0 : Math.floor((budget * block.allocatedMs) / total);
+    meeting.summary.overrunMs = Math.max(0, now - Date.parse(meeting.endsAt ?? ""));
+    delete meeting.currentBlockUuid;
+    return now;
+  }
+
+  private closeMeeting(meeting: AppMeeting): void {
+    for (const block of meeting.blocks ?? []) if (block.status === "pending") block.status = "not_run";
+    meeting.status = "completed";
+  }
+
   // ---- Alerts ----
 
   private alertSettings(item: Stored): AppAlertSettings {
@@ -648,7 +741,7 @@ export class FakeCustd {
 
   private addWebhook(item: Stored, endpoint: string): { webhook: AppAlertWebhook; signingSecret: string } {
     if (!endpoint.startsWith("https://")) throw new Problem(400, "app_alert_rule_invalid");
-    const webhook: AppAlertWebhook = { webhookUuid: crypto.randomUUID(), endpoint, createdAt: new Date().toISOString() };
+    const webhook: AppAlertWebhook = { webhookUuid: crypto.randomUUID(), kind: "webhook", endpoint, createdAt: new Date().toISOString() };
     item.alerts.webhooks.push(webhook);
     return { webhook, signingSecret: `whsec_${randomToken()}` };
   }
@@ -692,6 +785,26 @@ export class FakeCustd {
       rule.conditionMet = met;
     }
   }
+}
+
+function emptySummary(): AppMeeting["summary"] {
+  return { predictedMs: 0, finishedPredictedMs: 0, finishedActualMs: 0, finishedBlocks: 0, overrunMs: 0 };
+}
+
+/** The meeting as Custd reads it: totals summed from the blocks. */
+function meetingRead(stored: AppMeeting & { lastFinished: string | null }): AppMeeting {
+  const meeting: AppMeeting & { lastFinished?: string | null } = structuredClone(stored);
+  delete meeting.lastFinished;
+  const blocks = meeting.blocks ?? [];
+  const finished = blocks.filter((block) => block.status === "completed");
+  meeting.summary = {
+    predictedMs: blocks.reduce((sum, block) => sum + block.predictedMs, 0),
+    finishedPredictedMs: finished.reduce((sum, block) => sum + block.predictedMs, 0),
+    finishedActualMs: finished.reduce((sum, block) => sum + block.actualMs, 0),
+    finishedBlocks: finished.length,
+    overrunMs: meeting.summary.overrunMs,
+  };
+  return meeting;
 }
 
 function iso(ms: number): string {

@@ -1,8 +1,8 @@
 /** Typed shapes the pages render, mapped from Custd's app item reads in `mappers.ts`. */
 
-import type { AppForecastMethod, AppItemAccess, AppItemLink, AppItemOwnership, AppLinkRole, AppModelVersion } from "@haakco/custd-sdk/browser";
+import type { AppForecastMethod, AppItemAccess, AppItemLink, AppItemOwnership, AppLinkRole, AppMeeting, AppModelVersion } from "@haakco/custd-sdk/browser";
 
-export type ItemKind = "counter" | "project" | "model" | "dashboard";
+export type ItemKind = "counter" | "project" | "model" | "meeting" | "dashboard";
 
 /** Owner links read and change one item; share links only read it. */
 export type Access = AppLinkRole;
@@ -101,6 +101,13 @@ export type Model = ItemMeta & {
 
 export type ModelDraft = { name: string; description: string; expiresAfterSeconds: number };
 
+/** A meeting item: its agenda as Custd runs it. */
+export type Meeting = ItemMeta & { meeting: AppMeeting };
+
+export type AgendaBlockDraft = { title: string; minutes: number };
+
+export type MeetingDraft = { name: string; blocks: AgendaBlockDraft[]; expiresAfterSeconds: number };
+
 export type DashboardEntry = { entryUuid: string; itemUuid: string };
 
 export type Dashboard = ItemMeta & { entries: DashboardEntry[] };
@@ -142,4 +149,4 @@ export type ForecastSettings = { method: ForecastMethod; forecastFrom: string | 
 export type MeasurementsAdded = { accepted: number; rejected: number; targetReached: boolean; failure: unknown };
 
 /** "item" is a counter or a project: Custd's list does not say which until the item is read. */
-export type MyItem = { itemUuid: string; kind: "item" | "model" | "dashboard"; name: string; status: string; updatedAt: string };
+export type MyItem = { itemUuid: string; kind: "item" | "model" | "meeting" | "dashboard"; name: string; status: string; updatedAt: string };

@@ -18,8 +18,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@haakco/custd-react": "github:haakco/custd-sdk#v3.52.0&path:/sdk-react",
-    "@haakco/custd-sdk": "github:haakco/custd-sdk#v3.52.0&path:/sdk-js",
+    "@haakco/custd-react": "github:haakco/custd-sdk#v3.54.0&path:/sdk-react",
+    "@haakco/custd-sdk": "github:haakco/custd-sdk#v3.54.0&path:/sdk-js",
     "@tanstack/react-query": "^5.107.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

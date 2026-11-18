@@ -32,9 +32,15 @@ export function HomePage() {
           </li>
           <li className="card">
             <h3>
+              <Link to="/new/meeting">Run a meeting</Link>
+            </h3>
+            <p className="muted small">Give each part of the agenda a time, run it live, and see planned against actual.</p>
+          </li>
+          <li className="card">
+            <h3>
               <Link to="/new/dashboard">Make a dashboard</Link>
             </h3>
-            <p className="muted small">Put counters, projects and models on one screen that updates itself.</p>
+            <p className="muted small">Put counters, projects, models and meetings on one screen that updates itself.</p>
           </li>
         </ul>
       </section>

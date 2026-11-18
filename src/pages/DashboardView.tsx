@@ -1,4 +1,4 @@
-import type { AppItemRead } from "@haakco/custd-sdk/browser";
+import { APP_MEETING_STATUSES, type AppItemRead } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { DownloadMenu } from "../components/DownloadMenu";
@@ -10,11 +10,14 @@ import { Progress } from "../components/Progress";
 import { ItemHeader } from "../components/ItemHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { explainError, isGone, type DashboardEntry, type DoneWhenData, type ItemAccess } from "../data";
-import { dashboardOf, modelOf, projectOf, useCounter, useItemRead, useModelRun } from "../data/live";
+import { dashboardOf, meetingOf, modelOf, projectOf, useCounter, useItemRead, useModelRun } from "../data/live";
 import { itemKindOf, itemNameOf } from "../data/mappers";
+import { MeetingStatus } from "./MeetingView";
 import { modelOutputs } from "./ModelView";
 import { dashboardWorkbook } from "../lib/exports";
 import { counterSummary, modelHeadline, projectSummary } from "../lib/forecast-text";
+import { meetingLine } from "../lib/meeting";
+import { useNow } from "../lib/use-now";
 import type { ItemViewProps } from "./view-props";
 
 export function DashboardView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
@@ -75,6 +78,7 @@ function EntryCard({ data, access, entry, owner }: EntryProps) {
     const kind = itemKindOf(read.data);
     if (kind === "project") body = <ProjectEntry read={read.data} />;
     else if (kind === "model") body = <ModelEntry access={access} read={read.data} item={entry.itemUuid} />;
+    else if (kind === "meeting") body = <MeetingEntry read={read.data} />;
     else body = <CounterEntry access={access} read={read.data} item={entry.itemUuid} />;
   }
   return (
@@ -131,12 +135,26 @@ function ModelEntry({ access, read, item }: { access: ItemAccess; read: AppItemR
   );
 }
 
+function MeetingEntry({ read }: { read: AppItemRead }) {
+  const { meeting } = meetingOf(read);
+  const running = meeting.status === APP_MEETING_STATUSES.running;
+  const now = useNow(running);
+  const line = meetingLine(meeting, now);
+  return (
+    <>
+      <MeetingStatus meeting={meeting} />
+      <p className="entry__headline numeric">{line.headline}</p>
+      {line.detail ? <p className="small">{line.detail}</p> : null}
+    </>
+  );
+}
+
 function AddEntryForm({ data, access }: { data: DoneWhenData; access: ItemAccess }) {
   const [pasted, setPasted] = useState("");
   const add = useMutation({ mutationFn: (value: string) => data.addDashboardEntry(access, value) });
   return (
     <section className="section card" aria-labelledby="add-entry-heading">
-      <h2 id="add-entry-heading">Add a counter, project or model</h2>
+      <h2 id="add-entry-heading">Add a counter, project, model or meeting</h2>
       <form
         className="form"
         onSubmit={(event) => {

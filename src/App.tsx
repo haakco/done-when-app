@@ -7,6 +7,7 @@ import { OwnerPage, SharePage } from "./pages/ItemPage";
 import { MyItemsPage } from "./pages/MyItemsPage";
 import { NewCounterPage } from "./pages/NewCounterPage";
 import { NewDashboardPage } from "./pages/NewDashboardPage";
+import { NewMeetingPage } from "./pages/NewMeetingPage";
 import { NewModelPage } from "./pages/NewModelPage";
 import { NewProjectPage } from "./pages/NewProjectPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -20,10 +21,12 @@ export function App() {
         <Route path="new/counter" element={<NewCounterPage />} />
         <Route path="new/project" element={<NewProjectPage />} />
         <Route path="new/model" element={<NewModelPage />} />
+        <Route path="new/meeting" element={<NewMeetingPage />} />
         <Route path="new/dashboard" element={<NewDashboardPage />} />
         <Route path="c/:token" element={<SharePage />} />
         <Route path="p/:token" element={<SharePage />} />
         <Route path="m/:token" element={<SharePage />} />
+        <Route path="meet/:token" element={<SharePage />} />
         <Route path="d/:token" element={<SharePage />} />
         <Route path="edit/:kind" element={<OwnerPage />} />
         <Route path="mine" element={<MyItemsPage />} />

@@ -31,7 +31,7 @@ function MyItems({ data }: { data: DoneWhenData }) {
   if (!session.signedIn) {
     return (
       <div className="notice">
-        <p>Sign in to keep your counters, projects, models and dashboards in one list. Items you make while signed in are added for you; open an owner link and choose &ldquo;Add to my items&rdquo; for older ones.</p>
+        <p>Sign in to keep your counters, projects, models, meetings and dashboards in one list. Items you make while signed in are added for you; open an owner link and choose &ldquo;Add to my items&rdquo; for older ones.</p>
         <button type="button" className="button button--primary" disabled={session.pending} onClick={() => { session.signIn("/mine"); }}>
           Sign in
         </button>
