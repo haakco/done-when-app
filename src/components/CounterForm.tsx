@@ -18,7 +18,7 @@ export type CounterFormValues = { name: string; unit: string; startValue: string
 export const EMPTY_COUNTER: CounterFormValues = { name: "", unit: "", startValue: "0", targetValue: "", startedAt: "", deadline: "", history: "" };
 
 /** Owner pages say "your counter is ready" once, after creating it. */
-export type CreatedState = { created: true };
+export type CreatedState = { created: true; rejected?: number };
 
 type CounterFormProps = { data: DoneWhenData; initial?: CounterFormValues; moreOpen?: boolean };
 
@@ -31,7 +31,7 @@ export function CounterForm({ data, initial = EMPTY_COUNTER, moreOpen = false }:
   const [rowErrors, setRowErrors] = useState<CsvRowError[]>([]);
   const create = useMutation({
     mutationFn: (draft: CounterDraft) => data.createCounter(draft, { method, forecastFrom: null }),
-    onSuccess: (created) => navigate(ownerPath("counter", created.ownerToken), { state: { created: true } satisfies CreatedState }),
+    onSuccess: (created) => navigate(ownerPath("counter", created.ownerToken), { state: { created: true, rejected: created.rejected } satisfies CreatedState }),
   });
   const set = (key: keyof CounterFormValues) => (event: { target: { value: string } }) => {
     setForm({ ...form, [key]: event.target.value });

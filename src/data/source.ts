@@ -1,7 +1,6 @@
 import {
   APP_ITEM_ERROR_CODES,
   APP_ITEM_KINDS,
-  APP_LINK_ROLES,
   AppItemError,
   type AppItemRead,
   type AppItemsClient,
@@ -35,7 +34,8 @@ const MEASUREMENT_BATCH = 1000;
  * token, or `{ item }` for an item the signed-in user owns.
  */
 export type DoneWhenData = {
-  createCounter(draft: CounterDraft, forecast: ForecastSettings): Promise<CreatedItem>;
+  /** `rejected` counts start or history rows Custd refused. */
+  createCounter(draft: CounterDraft, forecast: ForecastSettings): Promise<CreatedItem & { rejected: number }>;
   addMeasurements(owner: ItemAccess, rows: Measurement[], forecast: ForecastSettings, totalAfter: number): Promise<MeasurementsAdded>;
   setForecast(owner: ItemAccess, forecast: ForecastSettings): Promise<void>;
   setRunSimilar(owner: ItemAccess, similar: boolean): Promise<void>;
@@ -92,9 +92,9 @@ export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient):
     async createCounter(draft, forecast) {
       const result = await items.createItem(counterCreateRequest(draft));
       const rows = draft.history.length > 0 ? draft.history : [{ measuredAt: draft.startedAt, value: draft.startValue }];
-      await addRows(result.ownerToken, rows);
-      if (rows.length >= FORECAST_MIN_MEASUREMENTS) await runForecast(result.ownerToken, forecast);
-      return created("counter", result);
+      const added = await addRows(result.ownerToken, rows);
+      if (added.accepted >= FORECAST_MIN_MEASUREMENTS) await runForecast(result.ownerToken, forecast);
+      return { ...created("counter", result), rejected: added.rejected };
     },
     async addMeasurements(owner, rows, forecast, totalAfter) {
       const added = await addRows(owner, rows);
@@ -237,5 +237,3 @@ export function isGone(error: unknown): boolean {
     (error.code === APP_ITEM_ERROR_CODES.notFound || error.code === APP_ITEM_ERROR_CODES.linkRefused || error.status === 404)
   );
 }
-
-export const OWNER_ROLE = APP_LINK_ROLES.owner;

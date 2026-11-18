@@ -25,7 +25,9 @@ import type { ItemViewProps } from "./view-props";
 export function CounterView({ data, access, read, showOwnerTools, ownerRoute }: ItemViewProps) {
   const live = useCounter(access, read);
   const location = useLocation();
-  const justCreated = (location.state as Partial<CreatedState> | null)?.created === true;
+  const createdState = location.state as Partial<CreatedState> | null;
+  const justCreated = createdState?.created === true;
+  const rejectedAtCreate = createdState?.rejected ?? 0;
   if (live.status === "loading") return <Loading what="counter" />;
   if (live.status === "error") return <ItemFailed error={live.error} what="counter" />;
   const counter = live.data;
@@ -39,6 +41,11 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute }: 
       {justCreated && showOwnerTools ? (
         <p className="notice notice--done" role="status">
           Your counter is ready. Bookmark this page: its address is your owner link. Share the view-only link below.
+        </p>
+      ) : null}
+      {justCreated && rejectedAtCreate > 0 ? (
+        <p className="notice notice--warn" role="alert">
+          {rejectedAtCreate} of your past numbers were not accepted. Add them again under &ldquo;Add several measurements&rdquo;.
         </p>
       ) : null}
       <section className="summary" aria-label="Summary">
@@ -168,9 +175,18 @@ function QuickAdd({ data, access, counter }: { data: DoneWhenData; access: ItemA
         pending={add.isPending}
         error={add.error}
         onSubmit={(rows, onSaved) => {
-          add.mutate(rows, { onSuccess: onSaved });
+          add.mutate(rows, {
+            onSuccess: (added) => {
+              if (added.rejected === 0) onSaved();
+            },
+          });
         }}
       />
+      {add.data && add.data.rejected > 0 ? (
+        <p className="field__error" role="alert">
+          Custd did not accept {add.data.rejected === 1 ? "that measurement" : `${add.data.rejected} measurements`}. Check the value and try again.
+        </p>
+      ) : null}
       {add.data?.targetReached ? (
         <p className="notice notice--done" role="status">
           <span aria-hidden="true">✓ </span>Target reached. Well done.
@@ -304,7 +320,7 @@ function RunsPanel({ data, access, counter }: { data: DoneWhenData; access: Item
           <WriteError error={similar.error} />
         </div>
       ) : (
-        <p className="small muted">This is the first run. Doing it again? Start a new run with the same target.</p>
+        <p className="small muted">Doing it again? Start a new counter with the same name and target.</p>
       )}
       <div className="button-row">
         <button
@@ -314,7 +330,7 @@ function RunsPanel({ data, access, counter }: { data: DoneWhenData; access: Item
             void navigate("/new/counter", { state: newRun });
           }}
         >
-          Start a new run
+          Start again with the same target
         </button>
       </div>
     </div>

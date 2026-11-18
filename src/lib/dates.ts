@@ -11,10 +11,6 @@ export function formatTime(date: Date): string {
   return timeFormat.format(date);
 }
 
-export function daysSince(iso: string, now: Date = new Date()): number {
-  return Math.floor((now.getTime() - Date.parse(iso)) / 86400_000);
-}
-
 /** A date input's `YYYY-MM-DD` as midnight UTC in RFC 3339. */
 export function dateInputToRfc3339(date: string): string {
   return `${date}T00:00:00Z`;

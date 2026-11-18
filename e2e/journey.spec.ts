@@ -50,7 +50,9 @@ test("create a counter from CSV, share it live, set an alert, then sign in and c
   await page.getByRole("button", { name: "Add to my items" }).click();
   await expect(page.getByText("In your items.")).toBeVisible();
   await page.getByRole("link", { name: "My items" }).click();
-  await expect(page.getByRole("link", { name: "Pages written" })).toBeVisible();
+  await page.getByRole("link", { name: "Pages written" }).click();
+  await expect(page).toHaveURL(/\/edit\/c#item=/);
+  await expect(page.getByRole("button", { name: "Add measurement" })).toBeVisible();
 });
 
 test("a share link cannot edit, even on the owner page", async ({ page }) => {

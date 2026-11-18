@@ -156,7 +156,7 @@ export class FakeCustd {
       case "POST /api/v1/app/item/measurements":
         return json(200, this.measure(caller, body.rows as { observedAt: string; value: number }[]));
       case "POST /api/v1/app/item/estimates":
-        return json(201, this.estimate(caller, body as { lowDate: string; highDate: string; note?: string }));
+        return json(201, this.estimate(caller, body as { estimatedAt?: string; lowDate: string; highDate: string; note?: string }));
       case "POST /api/v1/app/item/complete":
         return json(200, this.change(caller, () => { this.complete(caller.item, body.completedAt as string); }));
       case "POST /api/v1/app/item/cancel":
@@ -405,11 +405,11 @@ export class FakeCustd {
     return response;
   }
 
-  private estimate(caller: Caller, body: { lowDate: string; highDate: string; note?: string }): AppProjectEstimate {
+  private estimate(caller: Caller, body: { estimatedAt?: string; lowDate: string; highDate: string; note?: string }): AppProjectEstimate {
     const item = this.owner(caller);
     const estimate: AppProjectEstimate = {
       estimateUuid: crypto.randomUUID(),
-      estimatedAt: new Date().toISOString(),
+      estimatedAt: body.estimatedAt ?? new Date().toISOString(),
       lowDate: body.lowDate,
       highDate: body.highDate,
       note: body.note ?? "",

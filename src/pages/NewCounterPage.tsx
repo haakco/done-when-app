@@ -10,7 +10,7 @@ export function NewCounterPage() {
   const newRun = (location.state as Partial<NewRunState> | null)?.newRun;
   return (
     <>
-      <h1>{newRun ? `New run: ${newRun.name}` : "New counter"}</h1>
+      <h1>{newRun ? `Start again: ${newRun.name}` : "New counter"}</h1>
       <p className="lede">Count your way to a target and see when you will get there.</p>
       <WithData>{({ data }) => <CounterForm data={data} moreOpen {...(newRun ? { initial: newRun } : {})} />}</WithData>
     </>
