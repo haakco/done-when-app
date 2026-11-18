@@ -419,12 +419,12 @@ pub fn create_counter(ctx: &Context, draft: &CounterDraft) -> CliResult<CreatedR
         item_uuid: item_uuid.clone(),
         kind: ItemKind::Counter,
         name: draft.name.clone(),
-        share_url: item_url(
+        share_url: Some(item_url(
             &ctx.host,
             ItemKind::Counter,
             Access::Share,
             &created.share_token,
-        ),
+        )),
         owner_link_saved: true,
         start_measurement_added: false,
     };
@@ -686,7 +686,7 @@ pub fn list(ctx: &Context) -> CliResult<ListReport> {
             share_url: item
                 .share_token
                 .as_deref()
-                .and_then(|token| item_url(&ctx.host, item.kind, Access::Share, token)),
+                .map(|token| item_url(&ctx.host, item.kind, Access::Share, token)),
         })
         .collect();
     let signed_in = ctx.session()?.is_some();
@@ -782,10 +782,10 @@ pub fn share(ctx: &Context, reference: &str, with_owner: bool) -> CliResult<Shar
         });
     }
     Ok(ShareReport {
-        share_url: share_token.and_then(|t| item_url(&ctx.host, kind, Access::Share, &t)),
+        share_url: share_token.map(|t| item_url(&ctx.host, kind, Access::Share, &t)),
         owner_url: owner_token
             .filter(|_| with_owner)
-            .and_then(|t| item_url(&ctx.host, kind, Access::Owner, &t)),
+            .map(|t| item_url(&ctx.host, kind, Access::Owner, &t)),
     })
 }
 
@@ -868,12 +868,12 @@ pub fn create_dashboard(ctx: &Context, name: &str) -> CliResult<CreatedReport> {
         item_uuid,
         kind: ItemKind::Dashboard,
         name: name.to_owned(),
-        share_url: item_url(
+        share_url: Some(item_url(
             &ctx.host,
             ItemKind::Dashboard,
             Access::Share,
             &created.share_token,
-        ),
+        )),
         owner_link_saved: true,
         start_measurement_added: false,
     })
