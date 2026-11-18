@@ -1,7 +1,6 @@
 import { AppItemsClient } from "@haakco/custd-sdk/browser";
 import { describe, expect, it } from "vitest";
 import { FakeCustd, type FakeCustdOptions } from "../../e2e/fake-custd";
-import { AlertsClient } from "./alerts";
 import { toCounter } from "./mappers";
 import { createDoneWhenData, explainError } from "./source";
 
@@ -17,8 +16,7 @@ function setUp(options: Partial<FakeCustdOptions> = {}, userToken?: string) {
   };
   const { apiBaseUrl, browserKey } = fake.discovery();
   const items = new AppItemsClient({ apiBaseUrl, siteKey: browserKey, fetch: fetchFake, userToken: () => userToken });
-  const alerts = new AlertsClient({ apiBaseUrl, siteKey: browserKey, fetch: fetchFake, userToken: () => userToken });
-  return { fake, items, data: createDoneWhenData(items, alerts) };
+  return { fake, items, data: createDoneWhenData(items) };
 }
 
 async function counterRead(items: AppItemsClient, token: string) {

@@ -1,5 +1,12 @@
 import {
+  APP_ALERT_ERROR_CODES,
   APP_ITEM_ERROR_CODES,
+  type AppAlertDeliveryList,
+  type AppAlertRule,
+  type AppAlertRuleSpec,
+  type AppAlertSettings,
+  type AppAlertSubscription,
+  type AppAlertWebhookCreated,
   APP_ITEM_KINDS,
   AppItemError,
   type AppItemRead,
@@ -10,7 +17,6 @@ import {
 } from "@haakco/custd-sdk/browser";
 import { rememberShareToken } from "../lib/device";
 import { tokenFromPaste } from "../lib/links";
-import { ALERT_ERROR_CODES, type AlertDeliveryList, type AlertRule, type AlertRuleSpec, type AlertSettings, type AlertSubscription, type AlertsClient, type AlertWebhookCreated } from "./alerts";
 import type { DashboardRow } from "../lib/exports";
 import { dashboardRow } from "./dashboard-export";
 import { counterCreateRequest, modelCreateRequest, projectCreateRequest } from "./mappers";
@@ -76,17 +82,17 @@ export type DoneWhenData = {
   claim(ownerToken: string): Promise<void>;
   listMyItems(): Promise<MyItem[]>;
 
-  alertSettings(owner: ItemAccess): Promise<AlertSettings>;
-  alertDeliveries(owner: ItemAccess): Promise<AlertDeliveryList>;
-  addAlertRule(owner: ItemAccess, rule: AlertRuleSpec): Promise<AlertRule>;
+  alertSettings(owner: ItemAccess): Promise<AppAlertSettings>;
+  alertDeliveries(owner: ItemAccess): Promise<AppAlertDeliveryList>;
+  addAlertRule(owner: ItemAccess, rule: AppAlertRuleSpec): Promise<AppAlertRule>;
   removeAlertRule(owner: ItemAccess, ruleUuid: string): Promise<void>;
-  addWebhook(owner: ItemAccess, endpoint: string): Promise<AlertWebhookCreated>;
+  addWebhook(owner: ItemAccess, endpoint: string): Promise<AppAlertWebhookCreated>;
   removeWebhook(owner: ItemAccess, webhookUuid: string): Promise<void>;
-  subscribeEmail(owner: ItemAccess): Promise<AlertSubscription>;
+  subscribeEmail(owner: ItemAccess): Promise<AppAlertSubscription>;
   unsubscribeEmail(owner: ItemAccess): Promise<void>;
 };
 
-export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient): DoneWhenData {
+export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
   const created = (kind: CreatedItem["kind"], result: { item: AppItemRead; ownerToken: string; shareToken: string }): CreatedItem => {
     rememberShareToken(result.item.item.itemUuid, result.shareToken);
     return { kind, itemUuid: result.item.item.itemUuid, ownerToken: result.ownerToken, shareToken: result.shareToken };
@@ -227,14 +233,14 @@ export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient):
       }));
     },
 
-    alertSettings: (owner) => alerts.settings(owner),
-    alertDeliveries: (owner) => alerts.deliveries(owner),
-    addAlertRule: (owner, rule) => alerts.addRule(owner, rule),
-    removeAlertRule: (owner, ruleUuid) => alerts.removeRule(owner, ruleUuid),
-    addWebhook: (owner, endpoint) => alerts.addWebhook(owner, endpoint),
-    removeWebhook: (owner, webhookUuid) => alerts.removeWebhook(owner, webhookUuid),
-    subscribeEmail: (owner) => alerts.subscribe(owner),
-    unsubscribeEmail: (owner) => alerts.unsubscribe(owner),
+    alertSettings: (owner) => items.alertSettings(owner),
+    alertDeliveries: (owner) => items.alertDeliveries(owner),
+    addAlertRule: (owner, rule) => items.addAlertRule(owner, rule),
+    removeAlertRule: (owner, ruleUuid) => items.removeAlertRule(owner, ruleUuid),
+    addWebhook: (owner, endpoint) => items.addAlertWebhook(owner, { endpoint }),
+    removeWebhook: (owner, webhookUuid) => items.removeAlertWebhook(owner, webhookUuid),
+    subscribeEmail: (owner) => items.subscribeAlertEmail(owner),
+    unsubscribeEmail: (owner) => items.unsubscribeAlertEmail(owner),
   };
 }
 
@@ -273,12 +279,12 @@ const PLAIN_ERRORS: Record<string, string> = {
   [APP_ITEM_ERROR_CODES.userCheckUnavailable]: "Sign-in could not be checked just now. Try again in a moment.",
   [APP_ITEM_ERROR_CODES.unavailable]: "Done When cannot reach its data service. Reload the page to try again.",
   [APP_ITEM_ERROR_CODES.keyRefused]: "Done When cannot reach its data service. Reload the page to try again.",
-  [ALERT_ERROR_CODES.noVerifiedEmail]:
+  [APP_ALERT_ERROR_CODES.noVerifiedEmail]:
     "Verify your email address first: open the verification email from your sign-in, then come back and try again.",
-  [ALERT_ERROR_CODES.emailCheckUnavailable]: "Your email address could not be checked just now. Try again in a moment.",
-  [ALERT_ERROR_CODES.limit]: "This item has as many alerts as it can take. Remove one to add another.",
-  [ALERT_ERROR_CODES.ruleInvalid]: "That alert setting is not valid. Check the number and try again.",
-  [ALERT_ERROR_CODES.deliveryUnavailable]: "Alerts cannot be delivered just now. Try again later.",
+  [APP_ALERT_ERROR_CODES.emailCheckUnavailable]: "Your email address could not be checked just now. Try again in a moment.",
+  [APP_ALERT_ERROR_CODES.limit]: "This item has as many alerts as it can take. Remove one to add another.",
+  [APP_ALERT_ERROR_CODES.ruleInvalid]: "That alert setting is not valid. Check the number and try again.",
+  [APP_ALERT_ERROR_CODES.deliveryUnavailable]: "Alerts cannot be delivered just now. Try again later.",
 };
 
 /** Plain words for a failed call, saying what to do next. Never shows a token. */

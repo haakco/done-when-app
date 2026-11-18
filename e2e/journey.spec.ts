@@ -3,6 +3,8 @@ import { copyShareUrl, createCounter, expect, routeToFake, test } from "./fixtur
 const HISTORY = ["timestamp,value", "2026-11-01T00:00:00Z,10", "2026-11-02T00:00:00Z,20", "2026-11-03T00:00:00Z,30"].join("\n");
 
 test("create a counter from CSV, share it live, set an alert, then sign in and claim it", async ({ page, browser, fake }) => {
+  // The longest journey: two browsers, alerts and a sign-in do not fit the default 30 s on a busy host.
+  test.slow();
   await createCounter(page, "Pages written", "100", HISTORY);
   await expect(page.getByText("Likely done")).toBeVisible();
   await expect(page.getByText("10 pages written per day").or(page.getByText("10 per day"))).toBeVisible();

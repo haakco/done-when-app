@@ -23,7 +23,7 @@ import type {
   AppProjectEstimateList,
   HostedAppDiscovery,
 } from "@haakco/custd-sdk/browser";
-import type { AlertDelivery, AlertRule, AlertRuleSpec, AlertSettings, AlertWebhook } from "../src/data/alerts";
+import type { AppAlertDelivery, AppAlertRule, AppAlertRuleSpec, AppAlertSettings, AppAlertWebhook } from "@haakco/custd-sdk/browser";
 
 export type FakeRequest = { method: string; url: string; headers: Record<string, string>; body: string | null };
 export type FakeResponse = { status: number; headers: Record<string, string>; body?: string };
@@ -36,7 +36,7 @@ const DEFAULT_IDLE = 7 * 86_400;
 
 type Link = AppItemLink & { token: string; itemUuid: string };
 
-type Alerts = { rules: AlertRule[]; webhooks: AlertWebhook[]; subscribers: Set<string>; deliveries: AlertDelivery[] };
+type Alerts = { rules: AppAlertRule[]; webhooks: AppAlertWebhook[]; subscribers: Set<string>; deliveries: AppAlertDelivery[] };
 
 type Stored = {
   uuid: string;
@@ -192,7 +192,7 @@ export class FakeCustd {
       case "GET /api/v1/app/item/alerts/deliveries":
         return json(200, { deliveries: [...this.owner(caller).alerts.deliveries].reverse() });
       case "POST /api/v1/app/item/alerts/rules":
-        return json(201, this.addRule(this.owner(caller), body as AlertRuleSpec));
+        return json(201, this.addRule(this.owner(caller), body as AppAlertRuleSpec));
       case "POST /api/v1/app/item/alerts/webhooks":
         return json(201, this.addWebhook(this.owner(caller), body.endpoint as string));
       case "PUT /api/v1/app/item/alerts/subscription":
@@ -636,19 +636,19 @@ export class FakeCustd {
 
   // ---- Alerts ----
 
-  private alertSettings(item: Stored): AlertSettings {
+  private alertSettings(item: Stored): AppAlertSettings {
     return { rules: item.alerts.rules, webhooks: item.alerts.webhooks, deliveryAvailable: true };
   }
 
-  private addRule(item: Stored, spec: AlertRuleSpec): AlertRule {
-    const rule: AlertRule = { ...spec, ruleUuid: crypto.randomUUID(), conditionMet: false, crossings: 0, createdAt: new Date().toISOString() };
+  private addRule(item: Stored, spec: AppAlertRuleSpec): AppAlertRule {
+    const rule: AppAlertRule = { ...spec, ruleUuid: crypto.randomUUID(), conditionMet: false, crossings: 0, createdAt: new Date().toISOString() };
     item.alerts.rules.push(rule);
     return rule;
   }
 
-  private addWebhook(item: Stored, endpoint: string): { webhook: AlertWebhook; signingSecret: string } {
+  private addWebhook(item: Stored, endpoint: string): { webhook: AppAlertWebhook; signingSecret: string } {
     if (!endpoint.startsWith("https://")) throw new Problem(400, "app_alert_rule_invalid");
-    const webhook: AlertWebhook = { webhookUuid: crypto.randomUUID(), endpoint, createdAt: new Date().toISOString() };
+    const webhook: AppAlertWebhook = { webhookUuid: crypto.randomUUID(), endpoint, createdAt: new Date().toISOString() };
     item.alerts.webhooks.push(webhook);
     return { webhook, signingSecret: `whsec_${randomToken()}` };
   }

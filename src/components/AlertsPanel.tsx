@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ALERT_RULE_TYPES, type AlertRule, type AlertRuleSpec, type AlertRuleType, type AlertWebhookCreated } from "../data/alerts";
+import { APP_ALERT_RULE_TYPES, type AppAlertRule, type AppAlertRuleSpec, type AppAlertRuleType, type AppAlertWebhookCreated } from "@haakco/custd-sdk/browser";
 import type { DoneWhenData, ItemAccess, ItemKind } from "../data";
 import { formatDate } from "../lib/dates";
 import { percent } from "../lib/forecast-text";
@@ -9,25 +9,25 @@ import { Field } from "./Field";
 import { Loading, WriteError } from "./ItemStates";
 import { useSession } from "./Session";
 
-const RULE_CHOICES: Record<ItemKind, AlertRuleType[]> = {
-  counter: [ALERT_RULE_TYPES.targetReached, ALERT_RULE_TYPES.deadlineProbabilityBelow, ALERT_RULE_TYPES.forecastMovedInsideTarget],
-  project: [ALERT_RULE_TYPES.estimateStale],
+const RULE_CHOICES: Record<ItemKind, AppAlertRuleType[]> = {
+  counter: [APP_ALERT_RULE_TYPES.targetReached, APP_ALERT_RULE_TYPES.deadlineProbabilityBelow, APP_ALERT_RULE_TYPES.forecastMovedInsideTarget],
+  project: [APP_ALERT_RULE_TYPES.estimateStale],
   model: [],
   dashboard: [],
 };
 
-const RULE_LABEL: Record<AlertRuleType, string> = {
+const RULE_LABEL: Record<AppAlertRuleType, string> = {
   target_reached: "The target is reached",
   deadline_probability_below: "The chance of making the date drops below…",
   forecast_moved_inside_target: "The forecast moves inside the deadline",
   estimate_stale: "No new estimate for…",
 };
 
-export function ruleText(rule: AlertRuleSpec): string {
-  if (rule.type === ALERT_RULE_TYPES.deadlineProbabilityBelow && rule.threshold !== undefined) {
+export function ruleText(rule: AppAlertRuleSpec): string {
+  if (rule.type === APP_ALERT_RULE_TYPES.deadlineProbabilityBelow && rule.threshold !== undefined) {
     return `The chance of making the date drops below ${percent(rule.threshold)}`;
   }
-  if (rule.type === ALERT_RULE_TYPES.estimateStale && rule.staleDays !== undefined) {
+  if (rule.type === APP_ALERT_RULE_TYPES.estimateStale && rule.staleDays !== undefined) {
     return `No new estimate for ${rule.staleDays} days`;
   }
   return RULE_LABEL[rule.type];
@@ -80,7 +80,7 @@ export function AlertsPanel({ data, access, kind }: Props) {
   );
 }
 
-function RuleList({ data, access, rules, onChange }: { data: DoneWhenData; access: ItemAccess; rules: AlertRule[]; onChange: () => unknown }) {
+function RuleList({ data, access, rules, onChange }: { data: DoneWhenData; access: ItemAccess; rules: AppAlertRule[]; onChange: () => unknown }) {
   const remove = useMutation({ mutationFn: (ruleUuid: string) => data.removeAlertRule(access, ruleUuid), onSuccess: onChange });
   if (rules.length === 0) return <p className="small muted">No alerts yet. Pick one below.</p>;
   return (
@@ -105,24 +105,24 @@ function RuleList({ data, access, rules, onChange }: { data: DoneWhenData; acces
 
 function AddRuleForm({ data, access, kind, onAdded }: Props & { onAdded: () => unknown }) {
   const choices = RULE_CHOICES[kind];
-  const [type, setType] = useState<AlertRuleType>(choices[0] ?? ALERT_RULE_TYPES.targetReached);
+  const [type, setType] = useState<AppAlertRuleType>(choices[0] ?? APP_ALERT_RULE_TYPES.targetReached);
   const [threshold, setThreshold] = useState("50");
   const [staleDays, setStaleDays] = useState("14");
-  const add = useMutation({ mutationFn: (rule: AlertRuleSpec) => data.addAlertRule(access, rule), onSuccess: onAdded });
+  const add = useMutation({ mutationFn: (rule: AppAlertRuleSpec) => data.addAlertRule(access, rule), onSuccess: onAdded });
   return (
     <form
       className="form"
       onSubmit={(event) => {
         event.preventDefault();
-        const rule: AlertRuleSpec = { type };
-        if (type === ALERT_RULE_TYPES.deadlineProbabilityBelow) rule.threshold = Number(threshold) / 100;
-        if (type === ALERT_RULE_TYPES.estimateStale) rule.staleDays = Number(staleDays);
+        const rule: AppAlertRuleSpec = { type };
+        if (type === APP_ALERT_RULE_TYPES.deadlineProbabilityBelow) rule.threshold = Number(threshold) / 100;
+        if (type === APP_ALERT_RULE_TYPES.estimateStale) rule.staleDays = Number(staleDays);
         add.mutate(rule);
       }}
     >
       <Field label="Alert me when">
         {(control) => (
-          <select {...control} value={type} onChange={(event) => { setType(event.target.value as AlertRuleType); }}>
+          <select {...control} value={type} onChange={(event) => { setType(event.target.value as AppAlertRuleType); }}>
             {choices.map((choice) => (
               <option key={choice} value={choice}>
                 {RULE_LABEL[choice]}
@@ -131,12 +131,12 @@ function AddRuleForm({ data, access, kind, onAdded }: Props & { onAdded: () => u
           </select>
         )}
       </Field>
-      {type === ALERT_RULE_TYPES.deadlineProbabilityBelow ? (
+      {type === APP_ALERT_RULE_TYPES.deadlineProbabilityBelow ? (
         <Field label="Chance (%)">
           {(control) => <input {...control} type="number" min={1} max={99} required value={threshold} onChange={(event) => { setThreshold(event.target.value); }} />}
         </Field>
       ) : null}
-      {type === ALERT_RULE_TYPES.estimateStale ? (
+      {type === APP_ALERT_RULE_TYPES.estimateStale ? (
         <Field label="Days">
           {(control) => <input {...control} type="number" min={1} max={365} required value={staleDays} onChange={(event) => { setStaleDays(event.target.value); }} />}
         </Field>
@@ -166,7 +166,7 @@ function WebhookRow({ endpoint, onRemove }: { endpoint: string; onRemove: () => 
 
 function AddWebhookForm({ data, access, onAdded }: { data: DoneWhenData; access: ItemAccess; onAdded: () => unknown }) {
   const [endpoint, setEndpoint] = useState("");
-  const [created, setCreated] = useState<AlertWebhookCreated | null>(null);
+  const [created, setCreated] = useState<AppAlertWebhookCreated | null>(null);
   const add = useMutation({
     mutationFn: (url: string) => data.addWebhook(access, url),
     onSuccess: (result) => {
