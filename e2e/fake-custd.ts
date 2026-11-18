@@ -15,6 +15,10 @@ import type {
   AppLinkCollectionEntry,
   AppMeasurementBulkResponse,
   AppMeasurementProject,
+  AppModelQuantity,
+  AppModelQuantityResult,
+  AppModelRun,
+  AppUncertaintyModel,
   AppProjectEstimate,
   AppProjectEstimateList,
   HostedAppDiscovery,
@@ -42,6 +46,8 @@ type Stored = {
   updatedAt: string;
   ownerUser: string | null;
   project?: AppMeasurementProject;
+  model?: AppUncertaintyModel;
+  modelRuns: AppModelRun[];
   observations: { observedAt: string; value: number }[];
   estimates: AppProjectEstimate[];
   entries: AppLinkCollectionEntry[];
@@ -171,6 +177,15 @@ export class FakeCustd {
         return this.latest(request, caller);
       case "GET /api/v1/app/forecast/story":
         return this.conditional(request, `"${caller.item.version}"`, () => this.story(caller.item));
+      case "POST /api/v1/app/item/model/versions":
+        return json(201, this.change(caller, () => { this.saveVersion(caller.item, body.quantities as AppModelQuantity[], (body.note as string | undefined) ?? ""); }));
+      case "POST /api/v1/app/models/runs":
+        return json(201, this.runModel(caller, body.sensitivityOutput as string | undefined));
+      case "GET /api/v1/app/models/latest": {
+        const run = caller.item.modelRuns.at(-1);
+        if (!run) throw new Problem(404, "app_model_run_missing");
+        return this.conditional(request, `"model-run-${caller.item.modelRuns.length}"`, () => run);
+      }
       case "GET /api/v1/app/item/alerts":
         return json(200, this.alertSettings(this.owner(caller)));
       case "GET /api/v1/app/item/alerts/deliveries":
@@ -267,8 +282,14 @@ export class FakeCustd {
       estimates: [],
       entries: [],
       runs: [],
+      modelRuns: [],
       alerts: { rules: [], webhooks: [], subscribers: new Set(), deliveries: [] },
     };
+    if (request.kind === "uncertainty_model") {
+      const create = request.uncertaintyModel;
+      item.model = { modelUuid: crypto.randomUUID(), name: create.name, description: create.description ?? "", latestVersion: 0, createdAt: now, updatedAt: now };
+      if (create.quantities) this.saveVersion(item, create.quantities, create.note ?? "");
+    }
     if (request.kind === "measurement_project") {
       const create = request.measurementProject;
       item.project = {
@@ -333,6 +354,7 @@ export class FakeCustd {
       read.estimates = this.estimateList(item);
     }
     if (item.kind === "link_collection") read.linkCollection = { entries: item.entries };
+    if (item.model) read.uncertaintyModel = structuredClone(item.model);
     return read;
   }
 
@@ -342,7 +364,7 @@ export class FakeCustd {
       .filter((item) => item.ownerUser === user)
       .map((item) => {
         const read = this.read({ item, role: "owner", user, viaCollection: false });
-        return { ...read.item, name: item.project?.name ?? "", status: item.project?.status ?? "" };
+        return { ...read.item, name: item.project?.name ?? item.model?.name ?? "", status: item.project?.status ?? "" };
       });
   }
 
@@ -440,7 +462,7 @@ export class FakeCustd {
     const link = this.links.get(token);
     const target = link ? this.items.get(link.itemUuid) : undefined;
     if (!target) throw new Problem(404, "app_item_not_found");
-    if (target.kind !== "measurement_project") throw new Problem(422, "app_item_not_collectable");
+    if (target.kind !== "measurement_project" && target.kind !== "uncertainty_model") throw new Problem(422, "app_item_not_collectable");
     const entry: AppLinkCollectionEntry = {
       entryUuid: crypto.randomUUID(),
       itemUuid: target.uuid,
@@ -549,6 +571,65 @@ export class FakeCustd {
       trust: { state: "ok", evidence: "", observationCount: item.observations.length, snapshotCount: 0 },
       provenance: { owner: "fake", generatedAt: new Date().toISOString() },
     };
+  }
+
+  // ---- Models: each input's midpoint and spread, enough to drive the pages ----
+
+  private saveVersion(item: Stored, quantities: AppModelQuantity[], note: string): void {
+    const model = item.model;
+    if (!model) throw new Problem(409, "app_item_wrong_kind");
+    model.latestVersion += 1;
+    model.version = { versionUuid: crypto.randomUUID(), versionNumber: model.latestVersion, note, quantities, createdAt: new Date().toISOString() };
+  }
+
+  private runModel(caller: Caller, sensitivityOutput: string | undefined): AppModelRun {
+    const item = this.owner(caller);
+    const version = item.model?.version;
+    if (!item.model || !version) throw new Problem(409, "app_model_version_missing");
+    const centre = new Map<string, number>();
+    const quantities: AppModelQuantityResult[] = version.quantities.map((quantity) => {
+      let mid = 0;
+      let spread = 0;
+      if (quantity.kind === "input" && quantity.input.shape === "point") mid = quantity.input.value;
+      if (quantity.kind === "input" && quantity.input.shape === "range") {
+        mid = (quantity.input.low + quantity.input.high) / 2;
+        spread = (quantity.input.high - quantity.input.low) / 2;
+      }
+      if (quantity.kind === "formula") {
+        // Products and sums of named quantities only; the real engine parses full formulas.
+        const values = (quantity.formula.match(/[A-Za-z_]\w*/g) ?? []).map((name) => centre.get(name) ?? 0);
+        mid = quantity.formula.includes("*") ? values.reduce((product, value) => product * value, 1) : values.reduce((sum, value) => sum + value, 0);
+        spread = Math.abs(mid) * 0.2;
+      }
+      centre.set(quantity.name, mid);
+      return {
+        name: quantity.name,
+        summary: {
+          mean: mid,
+          stdDev: spread / 1.645,
+          percentiles: { p5: mid - spread, p25: mid - spread / 2, p50: mid, p75: mid + spread / 2, p95: mid + spread },
+          histogram: { min: mid - spread, max: mid + spread, counts: [1, 3, 8, 15, 22, 22, 15, 8, 3, 1] },
+        },
+      };
+    });
+    const inputs = version.quantities.filter((quantity) => quantity.kind === "input").map((quantity) => quantity.name);
+    const run: AppModelRun = {
+      runUuid: crypto.randomUUID(),
+      modelUuid: item.model.modelUuid,
+      versionNumber: version.versionNumber,
+      trigger: "request",
+      seed: 1,
+      sampleCount: 10000,
+      createdAt: new Date().toISOString(),
+      quantities,
+      boundInputs: [],
+      ...(sensitivityOutput
+        ? { sensitivityOutput, sensitivity: { output: sensitivityOutput, inputs: inputs.map((name, index) => ({ name, rankCorrelation: 0.8 / (index + 1), share: 1 / inputs.length })) } }
+        : {}),
+    };
+    item.modelRuns.push(run);
+    this.touch(item);
+    return run;
   }
 
   // ---- Alerts ----

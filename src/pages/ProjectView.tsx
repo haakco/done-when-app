@@ -1,14 +1,12 @@
 import { ConvergenceStory } from "@haakco/custd-react";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { useLocation } from "react-router";
 import { AlertsPanel } from "../components/AlertsPanel";
-import type { CreatedState } from "../components/CounterForm";
 import { Field } from "../components/Field";
 import { ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
 import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
-import { ShareBox } from "../components/ShareBox";
+import { ItemHeader } from "../components/ItemHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import type { DoneWhenData, EstimateDraft, ItemAccess, Project } from "../data";
 import { projectOf } from "../data/live";
@@ -22,23 +20,15 @@ export const STALE_AFTER_DAYS = 14;
 
 export function ProjectView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
   const project = projectOf(read);
-  const location = useLocation();
-  const justCreated = (location.state as Partial<CreatedState> | null)?.created === true;
   const summary = projectSummary(project);
   const narrow = useNarrow();
   const stale = project.status === "active" && project.latest !== null && project.latest.ageDays > STALE_AFTER_DAYS;
   return (
     <article aria-labelledby="item-name" className="item">
-      <header className="item__head">
-        <h1 id="item-name">{project.name}</h1>
+      <ItemHeader data={data} access={access} kind="project" meta={project} title={project.name} owner={showOwnerTools}>
         <StatusBadge status={project.status} />
         {stale && project.latest ? <StatusBadge status="stale" label={`Estimate is ${Math.floor(project.latest.ageDays)} days old`} /> : null}
-      </header>
-      {justCreated && showOwnerTools ? (
-        <p className="notice notice--done" role="status">
-          Your project is ready. Bookmark this page: its address is your owner link. Add your first estimate below.
-        </p>
-      ) : null}
+      </ItemHeader>
       <section className="summary" aria-label="Summary">
         <p className="summary__headline">{summary.headline}</p>
         {summary.detail ? <p className="summary__detail">{summary.detail}</p> : null}
@@ -51,7 +41,6 @@ export function ProjectView({ data, access, read, live, showOwnerTools, ownerRou
           <span className="muted">Done when: {project.definitionOfDone || "not written yet"}</span>
         </p>
       </section>
-      {showOwnerTools ? <ShareBox data={data} access={access} kind="project" meta={project} /> : null}
       {showOwnerTools && project.status === "active" ? <EstimateForm data={data} access={access} /> : null}
       <figure className="chart" aria-label="Estimate convergence">
         <ConvergenceStory

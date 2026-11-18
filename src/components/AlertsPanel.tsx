@@ -12,6 +12,7 @@ import { useSession } from "./Session";
 const RULE_CHOICES: Record<ItemKind, AlertRuleType[]> = {
   counter: [ALERT_RULE_TYPES.targetReached, ALERT_RULE_TYPES.deadlineProbabilityBelow, ALERT_RULE_TYPES.forecastMovedInsideTarget],
   project: [ALERT_RULE_TYPES.estimateStale],
+  model: [],
   dashboard: [],
 };
 

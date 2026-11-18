@@ -18,15 +18,19 @@ It should feel personal and a little playful, never like an operations console.
 
 ## Layout and density
 
-- One centred column, `--width-page` wide, generous spacing. Item pages lead with one summary
-  card: the answer as a headline ("Likely done Nov 19"), one detail line, progress and pace.
-  Then, for the owner only, the share box (one "Copy share link" button) and the one common
-  write (add a measurement or an estimate), then the chart and the live line.
+- One centred column, `--width-page` wide, generous spacing. Item pages start with the title and
+  one Share button beside it (it copies the view-only link; owners never share their owner
+  link), then a one-time "Save your owner link" notice for the owner, then one summary card:
+  the answer as a headline ("Likely done Nov 19"), one detail line, progress and pace. Then the
+  owner's one common write (add a measurement or an estimate), then the chart and the live line.
+- Item kinds: counter, project, model and dashboard share this page shape, the home page's
+  "Or" cards, "My items", "Recent on this device" and dashboard tiles.
 - Everything else sits behind `.more` disclosures (`<details>`): forecast detail, several
   measurements, forecast settings, runs, alerts, links and expiry. Share and owner pages read
   the same from the top.
-- The home page holds the create-counter form itself: name, target, "Create counter"; every
-  other field waits behind "More options".
+- The home page holds the create-counter form itself: two fields (name, target) and "Create
+  counter"; the free-text unit and everything else wait behind "More options". Below it: project,
+  model and dashboard starts, then "Recent on this device".
 - Header: wordmark (home link), "New counter", "New project", "My items", "API" (new dashboard
   starts from home). Skip link to `main`.
 - Grids (`.card-grid`, `.field-row`) wrap with `auto-fit`, so narrow screens stack without breakpoints.
@@ -50,6 +54,8 @@ Light (paper) is the default; dark (night sky ink) follows `prefers-color-scheme
 | `--color-finish` | Target, primary action, focus ring — the finish line |
 | `--color-forecast` | Forecast line, band and interval text |
 | `--color-done`, `--color-warn`, `--color-stop` | Completed, stale / at risk, canceled / error |
+
+Charts take their colours from the `--custd-chart-*` variables set on `.item`.
 
 Colour is never the only signal: status badges carry a word and a glyph (✓ done, ● active,
 ✕ canceled, ! stale); progress bars carry their percentage as text; chart series carry labels.
@@ -75,7 +81,9 @@ heavy shadows. The progress bar is a thick rule with a finish tick at the target
 | `StatusBadge` | Word + glyph + colour |
 | `Progress` | `<progress>`-equivalent with `role="progressbar"`, value text, finish tick |
 | `CopyButton` | Copies text; result announced in a polite live region; shows the text too |
-| `ShareBox` | Finish-colour bordered box under the summary; the owner's one-step share |
+| `ItemHeader` | Title, status, the Share button, and the owner's one-time owner-link notice (dismissal kept on this device) |
+| `RecentList` | Items opened in this browser, newest first, with "you can edit" or "view only"; "Clear this list" |
+| Model components | `ModelEditor`, `QuantityHistogram`, `SensitivityView`, `MeasureNextPanel`, `ModelCalculator` from `@haakco/custd-react`; the app styles their markup through `data-custd-*` attributes |
 | Charts | `@haakco/custd-react` `ForecastChart`, `ArrivalHistogram`, `ConvergenceStory` in `.chart`, coloured through the `--custd-chart-*` variables mapped to tokens; drawn smaller on phones so labels stay readable |
 | `LiveLine` | One quiet line: "Updates by itself", or stale / offline with what happens next |
 | `ItemStates` | Loading, not-here, read-only, write error and service-unavailable states, each with a next action |
@@ -108,4 +116,5 @@ by Custd's share previews (A5). They use the same palette and the serif display 
 | 2026-11-17 | Reduced motion zeroes every duration token rather than per-component overrides. |
 | 2026-11-17 | Form control borders use `--color-ink-muted`, not `--color-line`, to meet 3:1 non-text contrast. |
 | 2026-11-18 | Summary first, one share button, owner tools behind disclosures; the create-counter form lives on the home page. |
+| 2026-11-18 | Share sits beside the title; the owner-link notice shows once per item per device; models are a first-class item kind. |
 | 2026-11-18 | Grid children get `min-width: 0` and controls `width: 100%`, so long option text never widens the page at 400px. |

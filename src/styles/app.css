@@ -334,9 +334,7 @@ pre.code {
 .copy__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .copy .link-text { margin: var(--space-2) 0 0; color: var(--color-ink-muted); }
 
-.chart {
-  margin: var(--space-6) 0 0;
-  min-height: 18rem;
+.item {
   --custd-chart-observed: var(--color-ink);
   --custd-chart-forecast: var(--color-forecast);
   --custd-chart-band: var(--color-forecast-soft);
@@ -347,6 +345,11 @@ pre.code {
   --custd-chart-surface: var(--color-surface);
   --custd-chart-late: var(--color-stop);
   --custd-chart-stale: var(--color-warn);
+}
+
+.chart {
+  margin: var(--space-6) 0 0;
+  min-height: 18rem;
 }
 
 .chart svg { max-width: 100%; height: auto; display: block; }
@@ -497,3 +500,60 @@ pre.code {
 .field textarea { width: 100%; max-width: 100%; }
 
 .chart--short { min-height: 0; }
+
+/* ---- Share beside the title, the one-time owner link notice ---- */
+
+.item__head .share-button { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.share-button .status-line { min-height: 0; }
+
+.owner-notice { margin-bottom: var(--space-4); }
+.owner-notice__title { font-size: var(--text-lg); margin-bottom: var(--space-2); }
+.owner-notice p { margin-bottom: var(--space-3); }
+
+/* ---- Models: SDK components carry no classes, so the app styles their markup here ---- */
+
+.chart-grid { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); margin-top: var(--space-4); }
+.chart-grid .chart { margin: 0; }
+
+[data-custd-model-editor] { display: grid; gap: var(--space-3); }
+[data-custd-model-editor] fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: var(--space-3); min-width: 0; }
+[data-custd-model-editor] legend { font-family: var(--font-display); font-size: var(--text-lg); margin-bottom: var(--space-2); }
+[data-custd-model-editor] li { background: var(--color-surface); border: var(--border); border-radius: var(--radius); padding: var(--space-4); display: grid; gap: var(--space-2); }
+
+[data-custd-model-editor] label,
+[data-custd-model-calculator] label { font-weight: 600; display: block; }
+
+[data-custd-model-editor] input,
+[data-custd-model-editor] select,
+[data-custd-model-editor] textarea,
+.more__body form:not(.form) input,
+.more__body form:not(.form) select {
+  font: inherit;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-ink-muted);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  min-height: 2.75rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+[data-custd-model-editor] button,
+.more__body form:not(.form) button {
+  font: inherit;
+  font-weight: 600;
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-4);
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+  justify-self: start;
+}
+
+[data-custd-model-editor] button[type="submit"] { background: var(--color-finish); border-color: var(--color-finish); color: var(--color-finish-ink); }
+
+.item-list .card { padding: var(--space-3) var(--space-4); }
+.item-list + .button--quiet { padding-inline: 0; }

@@ -1,39 +1,30 @@
 import type { AppItemRead } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { useLocation } from "react-router";
-import type { CreatedState } from "../components/CounterForm";
 import { Field } from "../components/Field";
 import { ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
 import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
 import { Progress } from "../components/Progress";
-import { ShareBox } from "../components/ShareBox";
+import { ItemHeader } from "../components/ItemHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { explainError, isGone, type DashboardEntry, type DoneWhenData, type ItemAccess } from "../data";
-import { dashboardOf, projectOf, useCounter, useItemRead } from "../data/live";
-import { itemKindOf } from "../data/mappers";
+import { dashboardOf, modelOf, projectOf, useCounter, useItemRead, useModelRun } from "../data/live";
+import { itemKindOf, itemNameOf } from "../data/mappers";
+import { modelOutputs } from "./ModelView";
 import { counterSummary, projectSummary } from "../lib/forecast-text";
 import type { ItemViewProps } from "./view-props";
 
 export function DashboardView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
   const dashboard = dashboardOf(read);
-  const location = useLocation();
-  const justCreated = (location.state as Partial<CreatedState> | null)?.created === true;
   const count = dashboard.entries.length;
   return (
     <article aria-labelledby="item-name" className="item">
-      <header className="item__head">
-        <h1 id="item-name">Dashboard</h1>
+      <ItemHeader data={data} access={access} kind="dashboard" meta={dashboard} title="Dashboard" owner={showOwnerTools}>
         <span className="small muted">
           {count} item{count === 1 ? "" : "s"}
         </span>
-      </header>
-      {justCreated && showOwnerTools ? (
-        <p className="notice notice--done" role="status">
-          Your dashboard is ready. Bookmark this page: its address is your owner link.
-        </p>
-      ) : null}
+      </ItemHeader>
       {count === 0 ? (
         <p className="notice">
           Nothing here yet.{showOwnerTools ? " Paste a counter or project link below to add it." : ""}
@@ -46,7 +37,6 @@ export function DashboardView({ data, access, read, live, showOwnerTools, ownerR
       </ul>
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
       {showOwnerTools ? <AddEntryForm data={data} access={access} /> : null}
-      {showOwnerTools ? <ShareBox data={data} access={access} kind="dashboard" meta={dashboard} /> : null}
       {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
       {showOwnerTools ? (
         <details className="more section">
@@ -71,8 +61,11 @@ function EntryCard({ data, access, entry, owner }: EntryProps) {
   if (read.status === "loading") body = <p className="small muted">Loading…</p>;
   else if (read.status === "error") body = <p className="small muted">{isGone(read.error) ? "This item has expired or its link was replaced." : explainError(read.error)}</p>;
   else {
-    name = read.data.measurementProject?.name ?? "Item";
-    body = itemKindOf(read.data) === "project" ? <ProjectEntry read={read.data} /> : <CounterEntry access={access} read={read.data} item={entry.itemUuid} />;
+    name = itemNameOf(read.data);
+    const kind = itemKindOf(read.data);
+    if (kind === "project") body = <ProjectEntry read={read.data} />;
+    else if (kind === "model") body = <ModelEntry access={access} read={read.data} item={entry.itemUuid} />;
+    else body = <CounterEntry access={access} read={read.data} item={entry.itemUuid} />;
   }
   return (
     <li className="card entry">
@@ -116,12 +109,30 @@ function ProjectEntry({ read }: { read: AppItemRead }) {
   );
 }
 
+function ModelEntry({ access, read, item }: { access: ItemAccess; read: AppItemRead; item: string }) {
+  const model = modelOf(read);
+  const run = useModelRun(access, { item });
+  const output = modelOutputs(model)[0];
+  const summary = run.status === "ready" ? run.data?.quantities?.find((result) => result.name === output)?.summary : undefined;
+  const number = (value: number) => value.toLocaleString("en", { maximumSignificantDigits: 3 });
+  return (
+    <>
+      <p className="small muted">Model{model.latestVersion > 0 ? ` · version ${model.latestVersion}` : ""}</p>
+      <p className="entry__headline">
+        {summary && output
+          ? `${output}: about ${number(summary.percentiles.p50)} (90%: ${number(summary.percentiles.p5)} – ${number(summary.percentiles.p95)})`
+          : "No results yet"}
+      </p>
+    </>
+  );
+}
+
 function AddEntryForm({ data, access }: { data: DoneWhenData; access: ItemAccess }) {
   const [pasted, setPasted] = useState("");
   const add = useMutation({ mutationFn: (value: string) => data.addDashboardEntry(access, value) });
   return (
     <section className="section card" aria-labelledby="add-entry-heading">
-      <h2 id="add-entry-heading">Add a counter or project</h2>
+      <h2 id="add-entry-heading">Add a counter, project or model</h2>
       <form
         className="form"
         onSubmit={(event) => {

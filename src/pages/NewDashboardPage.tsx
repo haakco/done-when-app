@@ -1,7 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import type { CreatedState } from "../components/CounterForm";
 import { ExpiryField } from "../components/ExpiryField";
 import { Field } from "../components/Field";
 import { WriteError } from "../components/ItemStates";
@@ -26,7 +25,7 @@ function DashboardForm({ data }: { data: DoneWhenData }) {
   const [expiry, setExpiry] = useState(DEFAULT_EXPIRY_SECONDS);
   const create = useMutation({
     mutationFn: (draft: DashboardDraft) => data.createDashboard(draft),
-    onSuccess: (created) => navigate(ownerPath("dashboard", created.ownerToken), { state: { created: true } satisfies CreatedState }),
+    onSuccess: (created) => navigate(ownerPath("dashboard", created.ownerToken)),
   });
   return (
     <form

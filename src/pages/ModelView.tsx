@@ -1,0 +1,150 @@
+import { MeasureNextPanel, ModelCalculator, ModelEditor, QuantityHistogram, SensitivityView } from "@haakco/custd-react";
+import { APP_MODEL_QUANTITY_KINDS, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
+import { useMutation } from "@tanstack/react-query";
+import { ItemHeader } from "../components/ItemHeader";
+import { Loading, ReadOnlyNotice, WriteError } from "../components/ItemStates";
+import { LiveLine } from "../components/LiveLine";
+import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
+import type { DoneWhenData, ItemAccess, Model } from "../data";
+import { modelOf, useModelRun } from "../data/live";
+import { formatDate } from "../lib/dates";
+import type { ItemViewProps } from "./view-props";
+
+/** Formula quantities are the model's outputs; the rest are inputs. */
+export function modelOutputs(model: Model): string[] {
+  return (model.version?.quantities ?? []).filter((quantity) => quantity.kind === APP_MODEL_QUANTITY_KINDS.formula).map((quantity) => quantity.name);
+}
+
+export function modelInputs(model: Model): string[] {
+  return (model.version?.quantities ?? []).filter((quantity) => quantity.kind === APP_MODEL_QUANTITY_KINDS.input).map((quantity) => quantity.name);
+}
+
+export function ModelView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
+  const model = modelOf(read);
+  const run = useModelRun(access);
+  const outputs = modelOutputs(model);
+  return (
+    <article aria-labelledby="item-name" className="item">
+      <ItemHeader data={data} access={access} kind="model" meta={model} title={model.name} owner={showOwnerTools}>
+        <span className="small muted">{model.latestVersion > 0 ? `Version ${model.latestVersion}` : "No quantities yet"}</span>
+      </ItemHeader>
+      {model.description ? <p className="lede">{model.description}</p> : null}
+      {model.queuedRunError ? (
+        <p className="notice notice--warn" role="status">
+          The last automatic run failed ({model.queuedRunError}). The results below are from the run before it.
+        </p>
+      ) : null}
+      {run.status === "loading" ? <Loading what="results" /> : null}
+      {run.status === "error" ? <WriteError error={run.error} /> : null}
+      {run.status === "ready" ? <ModelResults model={model} run={run.data} outputs={outputs} /> : null}
+      {showOwnerTools && model.latestVersion > 0 ? <RunButton data={data} access={access} outputs={outputs} /> : null}
+      <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
+      {model.version && outputs.length > 0 ? (
+        <details className="more section">
+          <summary>Try other values</summary>
+          <div className="more__body">
+            <ModelCalculator version={model.version} inputs={modelInputs(model)} outputs={outputs} access={access} />
+          </div>
+        </details>
+      ) : null}
+      {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
+      {showOwnerTools ? <ModelOwnerTools data={data} access={access} model={model} /> : null}
+    </article>
+  );
+}
+
+function ModelResults({ model, run, outputs }: { model: Model; run: AppModelRun | null; outputs: string[] }) {
+  if (run === null) {
+    return (
+      <section className="summary" aria-label="Summary">
+        <p className="summary__headline">No results yet</p>
+        <p className="summary__detail">
+          {model.latestVersion > 0 ? "Run the model to see the range of each result." : "Add quantities below, then run the model."}
+        </p>
+      </section>
+    );
+  }
+  const results = (run.quantities ?? []).filter((result) => outputs.length === 0 || outputs.includes(result.name));
+  const units = new Map((model.version?.quantities ?? []).map((quantity) => [quantity.name, quantity.unit ?? ""]));
+  return (
+    <>
+      <section className="summary" aria-label="Summary">
+        <p className="summary__headline">{headline(results[0], units)}</p>
+        <p className="summary__detail small">
+          From {run.sampleCount.toLocaleString("en")} simulated trials of version {run.versionNumber}, {formatDate(run.createdAt)}.
+        </p>
+      </section>
+      <div className="chart-grid">
+        {results.map((result) => {
+          const unit = units.get(result.name);
+          return (
+            <figure key={result.name} className="chart chart--short" aria-label={`${result.name} range`}>
+              <QuantityHistogram result={result} title={result.name} {...(unit ? { unit } : {})} />
+            </figure>
+          );
+        })}
+      </div>
+      {run.sensitivity ? (
+        <details className="more section">
+          <summary>What drives the result?</summary>
+          <div className="more__body">
+            <SensitivityView sensitivity={run.sensitivity} />
+          </div>
+        </details>
+      ) : null}
+      {run.information || run.decision ? (
+        <details className="more">
+          <summary>What to measure next</summary>
+          <div className="more__body">
+            <MeasureNextPanel information={run.information} {...(run.decision ? { decision: run.decision } : {})} />
+          </div>
+        </details>
+      ) : null}
+    </>
+  );
+}
+
+function headline(result: AppModelQuantityResult | undefined, units: Map<string, string>): string {
+  if (!result?.summary) return result?.error ? `${result.name}: not calculated` : "Results";
+  const { p5, p50, p95 } = result.summary.percentiles;
+  const unit = units.get(result.name) ? ` ${units.get(result.name) ?? ""}` : "";
+  const number = (value: number) => value.toLocaleString("en", { maximumSignificantDigits: 3 });
+  return `${result.name}: about ${number(p50)}${unit} (90%: ${number(p5)} – ${number(p95)})`;
+}
+
+function RunButton({ data, access, outputs }: { data: DoneWhenData; access: ItemAccess; outputs: string[] }) {
+  const run = useMutation({ mutationFn: () => data.runModel(access, outputs[0] ? { sensitivityOutput: outputs[0] } : {}) });
+  return (
+    <div className="button-row section">
+      <button type="button" className="button button--primary" disabled={run.isPending} onClick={() => { run.mutate(); }}>
+        {run.isPending ? "Running…" : "Run model"}
+      </button>
+      <WriteError error={run.error} />
+    </div>
+  );
+}
+
+function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: ItemAccess; model: Model }) {
+  return (
+    <section className="section owner-tools" aria-labelledby="owner-heading">
+      <h2 id="owner-heading">Owner tools</h2>
+      <details className="more" open={model.latestVersion === 0}>
+        <summary>Edit quantities</summary>
+        <div className="more__body">
+          <ModelEditor
+            key={model.latestVersion}
+            quantities={model.version?.quantities ?? []}
+            onSave={(request) => data.saveModelVersion(access, request)}
+          />
+        </div>
+      </details>
+      <details className="more">
+        <summary>Links, expiry and my items</summary>
+        <div className="more__body">
+          <KeepInMyItems data={data} access={access} kind="model" meta={model} />
+          <LinksAndExpiry data={data} access={access} kind="model" meta={model} />
+        </div>
+      </details>
+    </section>
+  );
+}

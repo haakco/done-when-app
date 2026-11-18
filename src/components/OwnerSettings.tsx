@@ -1,21 +1,44 @@
+import { APP_LINK_ROLES } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import type { DoneWhenData, ItemAccess, ItemKind, ItemMeta } from "../data";
 import { formatDate } from "../lib/dates";
-import { absoluteUrl } from "../lib/links";
+import { absoluteUrl, sharePath } from "../lib/links";
 import { CopyButton } from "./CopyButton";
 import { ExpiryField } from "./ExpiryField";
+import { useShareToken } from "./ItemHeader";
 import { WriteError } from "./ItemStates";
 import { useSession } from "./Session";
 
 type Props = { data: DoneWhenData; access: ItemAccess; kind: ItemKind; meta: ItemMeta };
 
-/** The owner link and the idle-expiry window. */
-export function LinksAndExpiry({ data, access, meta }: Props) {
+/** The share and owner links, replacing the share link, and the idle-expiry window. */
+export function LinksAndExpiry({ data, access, kind, meta }: Props) {
+  const shareToken = useShareToken(meta.itemUuid);
+  const shareLink = meta.links.find((link) => link.role === APP_LINK_ROLES.share);
+  const replace = useMutation({ mutationFn: (linkUuid: string) => data.replaceShareLink(access, meta.itemUuid, linkUuid) });
   const [expiry, setExpiry] = useState(meta.idleExpirySeconds);
   const save = useMutation({ mutationFn: (seconds: number) => data.setExpiry(access, seconds) });
   return (
     <div className="stack">
+      <div>
+        <h3>View-only link</h3>
+        {shareToken ? (
+          <CopyButton label="Copy view-only link" text={absoluteUrl(sharePath(kind, shareToken))} />
+        ) : (
+          <p className="small muted">This browser does not have it. Share above makes a new one.</p>
+        )}
+        {shareLink ? (
+          <details className="quiet-details">
+            <summary>Shared it with the wrong person?</summary>
+            <p className="small">Replace the link: the old one stops working at once.</p>
+            <button type="button" className="button button--quiet" disabled={replace.isPending} onClick={() => { replace.mutate(shareLink.linkUuid); }}>
+              {replace.isPending ? "Replacing…" : "Replace view-only link"}
+            </button>
+            <WriteError error={replace.error} />
+          </details>
+        ) : null}
+      </div>
       {typeof access === "string" ? (
         <div>
           <h3>Owner link</h3>

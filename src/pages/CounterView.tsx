@@ -11,7 +11,7 @@ import { AddMeasurementForm, CsvImportForm } from "../components/MeasurementForm
 import { MethodField } from "../components/MethodField";
 import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
 import { Progress } from "../components/Progress";
-import { ShareBox } from "../components/ShareBox";
+import { ItemHeader } from "../components/ItemHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Counter, DoneWhenData, ForecastMethod, ItemAccess, Measurement } from "../data";
 import { useCounter } from "../data/live";
@@ -25,25 +25,17 @@ import type { ItemViewProps } from "./view-props";
 export function CounterView({ data, access, read, showOwnerTools, ownerRoute }: ItemViewProps) {
   const live = useCounter(access, read);
   const location = useLocation();
-  const createdState = location.state as Partial<CreatedState> | null;
-  const justCreated = createdState?.created === true;
-  const rejectedAtCreate = createdState?.rejected ?? 0;
+  const rejectedAtCreate = (location.state as Partial<CreatedState> | null)?.rejected ?? 0;
   if (live.status === "loading") return <Loading what="counter" />;
   if (live.status === "error") return <ItemFailed error={live.error} what="counter" />;
   const counter = live.data;
   const summary = counterSummary(counter);
   return (
     <article aria-labelledby="item-name" className="item">
-      <header className="item__head">
-        <h1 id="item-name">{counter.name}</h1>
+      <ItemHeader data={data} access={access} kind="counter" meta={counter} title={counter.name} owner={showOwnerTools}>
         <StatusBadge status={counter.status} />
-      </header>
-      {justCreated && showOwnerTools ? (
-        <p className="notice notice--done" role="status">
-          Your counter is ready. Bookmark this page: its address is your owner link. Share the view-only link below.
-        </p>
-      ) : null}
-      {justCreated && rejectedAtCreate > 0 ? (
+      </ItemHeader>
+      {showOwnerTools && rejectedAtCreate > 0 ? (
         <p className="notice notice--warn" role="alert">
           {rejectedAtCreate} of your past numbers were not accepted. Add them again under &ldquo;Add several measurements&rdquo;.
         </p>
@@ -54,7 +46,6 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute }: 
         <Progress label="Progress to target" current={counter.latestValue} start={counter.startValue} target={counter.targetValue} unit={counter.unit} />
         <RateLine measurements={counter.measurements} unit={counter.unit} />
       </section>
-      {showOwnerTools ? <ShareBox data={data} access={access} kind="counter" meta={counter} /> : null}
       {showOwnerTools ? <QuickAdd data={data} access={access} counter={counter} /> : null}
       <CounterChart counter={counter} />
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />

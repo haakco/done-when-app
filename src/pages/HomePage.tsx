@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { CounterForm } from "../components/CounterForm";
 import { Field } from "../components/Field";
+import { RecentList } from "../components/RecentList";
 import { WithData } from "../components/WithData";
 import { parseAppItemLink } from "@haakco/custd-sdk/browser";
 
@@ -25,12 +26,19 @@ export function HomePage() {
           </li>
           <li className="card">
             <h3>
+              <Link to="/new/model">Build a model</Link>
+            </h3>
+            <p className="muted small">Put ranges on what you are unsure of and see the range of the answer.</p>
+          </li>
+          <li className="card">
+            <h3>
               <Link to="/new/dashboard">Make a dashboard</Link>
             </h3>
-            <p className="muted small">Put several counters and projects on one screen that updates itself.</p>
+            <p className="muted small">Put counters, projects and models on one screen that updates itself.</p>
           </li>
         </ul>
       </section>
+      <RecentList />
       <OpenLink />
     </>
   );

@@ -1,4 +1,4 @@
-import { createCounter, expect, routeToFake, test } from "./fixtures";
+import { copyShareUrl, createCounter, expect, routeToFake, test } from "./fixtures";
 
 const HISTORY = ["timestamp,value", "2026-11-01T00:00:00Z,10", "2026-11-02T00:00:00Z,20", "2026-11-03T00:00:00Z,30"].join("\n");
 
@@ -9,9 +9,7 @@ test("create a counter from CSV, share it live, set an alert, then sign in and c
   await expect(page).toHaveURL(/\/edit\/c#[A-Za-z0-9_-]{43}$/);
 
   // One copy button shares the view-only link.
-  await page.getByRole("button", { name: "Copy share link" }).click();
-  await expect(page.getByText("Copied.")).toBeVisible();
-  const shareUrl = await page.evaluate(() => navigator.clipboard.readText());
+  const shareUrl = await copyShareUrl(page);
   expect(shareUrl).toMatch(/\/c\/[A-Za-z0-9_-]{43}$/);
 
   // A second browser opens the share link read-only and sees a new measurement arrive.
@@ -57,13 +55,13 @@ test("create a counter from CSV, share it live, set an alert, then sign in and c
 
 test("a share link cannot edit, even on the owner page", async ({ page }) => {
   await createCounter(page, "Laps", "10");
-  const shareUrl = await page.locator(".share-box code").innerText();
+  const shareUrl = await copyShareUrl(page);
   const shareToken = shareUrl.split("/").at(-1) ?? "";
   await page.goto(`/edit/c#${shareToken}`);
   await expect(page.getByRole("heading", { level: 1, name: "Laps" })).toBeVisible();
   await expect(page.getByText(/view-only link/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Add measurement" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Copy share link" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy owner link" })).toHaveCount(0);
 });
 
 test("a project shows its estimates converging on the delivery target", async ({ page }) => {
@@ -90,7 +88,7 @@ test("a project shows its estimates converging on the delivery target", async ({
 
 test("a dashboard adds and removes an item", async ({ page }) => {
   await createCounter(page, "Chapters", "24");
-  const shareUrl = await page.locator(".share-box code").innerText();
+  const shareUrl = await copyShareUrl(page);
   await page.goto("/new/dashboard");
   await page.getByRole("button", { name: "Create dashboard" }).click();
   await expect(page.getByText("Nothing here yet.", { exact: false })).toBeVisible();
@@ -123,4 +121,39 @@ test("owner tokens never reach a URL path or query", async ({ page, fake }) => {
   await createCounter(page, "Private", "3");
   const ownerToken = new URL(page.url()).hash.slice(1);
   expect(fake.requests.some((request) => request.url.includes(ownerToken))).toBe(false);
+});
+
+test("the owner link notice shows once and the item is listed as recent on this device", async ({ page }) => {
+  await createCounter(page, "Push-ups", "100");
+  await expect(page.getByRole("heading", { name: "Save your owner link" })).toBeVisible();
+  await page.getByRole("button", { name: "Got it" }).click();
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: "Push-ups" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Save your owner link" })).toHaveCount(0);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Recent on this device" })).toBeVisible();
+  await page.getByRole("link", { name: "Push-ups" }).click();
+  await expect(page.getByRole("button", { name: "Add measurement" })).toBeVisible();
+});
+
+test("a model is built, run and shown on a dashboard", async ({ page }) => {
+  await page.goto("/new/model");
+  await page.getByLabel("What are you working out?").fill("Monthly cost");
+  await page.getByRole("button", { name: "Create model" }).click();
+  await expect(page.getByText("Add quantities below, then run the model.")).toBeVisible();
+  for (const [index, [name, value]] of [["hours", "5 to 10"], ["rate", "3"], ["total", "=hours * rate"]].entries()) {
+    await page.getByRole("button", { name: "Add quantity" }).click();
+    await page.getByLabel("Name", { exact: true }).nth(index).fill(name ?? "");
+    await page.getByLabel("Value", { exact: true }).nth(index).fill(value ?? "");
+  }
+  await page.getByRole("button", { name: "Save version" }).click();
+  await expect(page.getByText("Version 1")).toBeVisible();
+  await page.getByRole("button", { name: "Run model" }).click();
+  await expect(page.getByText("total: about 22.5")).toBeVisible();
+  const shareUrl = await copyShareUrl(page);
+  await page.goto("/new/dashboard");
+  await page.getByLabel("Links to show (optional)").fill(shareUrl);
+  await page.getByRole("button", { name: "Create dashboard" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Monthly cost" })).toBeVisible();
+  await expect(page.getByText(/total: about 22\.5/)).toBeVisible();
 });

@@ -5,11 +5,13 @@ import {
   type AppItemRead,
   type AppItemsClient,
   type AppMeasurementBulkResponse,
+  type AppModelRunRequest,
+  type AppModelVersionCreateRequest,
 } from "@haakco/custd-sdk/browser";
 import { rememberShareToken } from "../lib/device";
 import { tokenFromPaste } from "../lib/links";
 import { ALERT_ERROR_CODES, type AlertDeliveryList, type AlertRule, type AlertRuleSpec, type AlertSettings, type AlertSubscription, type AlertsClient, type AlertWebhookCreated } from "./alerts";
-import { counterCreateRequest, projectCreateRequest } from "./mappers";
+import { counterCreateRequest, modelCreateRequest, projectCreateRequest } from "./mappers";
 import type {
   CounterDraft,
   CreatedItem,
@@ -19,6 +21,7 @@ import type {
   ItemAccess,
   Measurement,
   MeasurementsAdded,
+  ModelDraft,
   MyItem,
   ProjectDraft,
 } from "./types";
@@ -46,6 +49,11 @@ export type DoneWhenData = {
   setDeliveryTarget(owner: ItemAccess, deliveryTarget: string): Promise<void>;
   completeProject(owner: ItemAccess, completedAt: string): Promise<void>;
   cancelProject(owner: ItemAccess): Promise<void>;
+
+  createModel(draft: ModelDraft): Promise<CreatedItem>;
+  saveModelVersion(owner: ItemAccess, request: AppModelVersionCreateRequest): Promise<void>;
+  /** Runs the latest version and stores the run every viewer sees. */
+  runModel(owner: ItemAccess, request: Omit<AppModelRunRequest, "seed">): Promise<void>;
 
   createDashboard(draft: DashboardDraft): Promise<CreatedItem>;
   addDashboardEntry(owner: ItemAccess, pasted: string): Promise<void>;
@@ -132,6 +140,16 @@ export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient):
       await items.cancel(owner);
     },
 
+    async createModel(draft) {
+      return created("model", await items.createItem(modelCreateRequest(draft)));
+    },
+    async saveModelVersion(owner, request) {
+      await items.addModelVersion(owner, request);
+    },
+    async runModel(owner, request) {
+      await items.runModel(owner, { ...request, seed: Math.floor(Math.random() * 2 ** 31) });
+    },
+
     async createDashboard(draft) {
       const result = await items.createItem({ kind: APP_ITEM_KINDS.linkCollection, idleExpirySeconds: draft.expiresAfterSeconds });
       for (const pasted of draft.entryRefs) {
@@ -161,7 +179,7 @@ export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient):
       const list = await items.listMyItems();
       return (list.items ?? []).map((item) => ({
         itemUuid: item.itemUuid,
-        kind: item.kind === APP_ITEM_KINDS.linkCollection ? "dashboard" : "item",
+        kind: myItemKind(item.kind),
         name: item.name,
         status: item.status,
         updatedAt: item.updatedAt,
@@ -177,6 +195,12 @@ export function createDoneWhenData(items: AppItemsClient, alerts: AlertsClient):
     subscribeEmail: (owner) => alerts.subscribe(owner),
     unsubscribeEmail: (owner) => alerts.unsubscribe(owner),
   };
+}
+
+function myItemKind(kind: string): MyItem["kind"] {
+  if (kind === APP_ITEM_KINDS.linkCollection) return "dashboard";
+  if (kind === APP_ITEM_KINDS.uncertaintyModel) return "model";
+  return "item";
 }
 
 export class PastedLinkError extends Error {
@@ -200,7 +224,7 @@ const PLAIN_ERRORS: Record<string, string> = {
   [APP_ITEM_ERROR_CODES.createLimited]: "Too many new items from here just now. Wait a minute and try again.",
   [APP_ITEM_ERROR_CODES.measurementLimit]: "This counter is full: it cannot take more measurements.",
   [APP_ITEM_ERROR_CODES.collectionFull]: "This dashboard is full. Remove an item to add another.",
-  [APP_ITEM_ERROR_CODES.notCollectable]: "That link cannot go on a dashboard. Paste a counter or project link.",
+  [APP_ITEM_ERROR_CODES.notCollectable]: "That link cannot go on a dashboard. Paste a counter, project or model link.",
   [APP_ITEM_ERROR_CODES.wrongKind]: "That link opens a different kind of item.",
   [APP_ITEM_ERROR_CODES.claimed]: "Someone else already keeps this item in their list.",
   [APP_ITEM_ERROR_CODES.userRefused]: "Your sign-in has ended. Sign in again.",

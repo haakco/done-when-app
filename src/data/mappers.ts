@@ -20,6 +20,8 @@ import type {
   ItemKind,
   ItemMeta,
   Measurement,
+  Model,
+  ModelDraft,
   Project,
   ProjectDraft,
   ProjectEstimate,
@@ -36,10 +38,11 @@ const DAY_MS = 86_400_000;
 
 export const DEFAULT_FORECAST_METHOD: ForecastMethod = APP_FORECAST_METHODS.bayesianLinearRegression;
 
-export const KIND_PATH: Record<ItemKind, string> = { counter: "c", project: "p", dashboard: "d" };
+export const KIND_PATH: Record<ItemKind, string> = { counter: "c", project: "p", model: "m", dashboard: "d" };
 
 export function itemKindOf(read: AppItemRead): ItemKind {
   if (read.item.kind === APP_ITEM_KINDS.linkCollection) return "dashboard";
+  if (read.item.kind === APP_ITEM_KINDS.uncertaintyModel) return "model";
   return read.measurementProject?.series?.[0]?.seriesCode === PROJECT_SERIES_CODE ? "project" : "counter";
 }
 
@@ -154,6 +157,32 @@ export function withConvergence(
     }
     return mapped;
   });
+}
+
+export function toModel(read: AppItemRead): Model {
+  const model = read.uncertaintyModel;
+  if (!model) throw new Error("item has no uncertainty model");
+  return {
+    ...metaOf(read),
+    name: model.name,
+    description: model.description,
+    latestVersion: model.latestVersion,
+    version: model.version ?? null,
+    queuedRunError: model.queuedRunFailure?.error ?? null,
+  };
+}
+
+/** The item's display name, whatever its kind. */
+export function itemNameOf(read: AppItemRead): string {
+  return read.measurementProject?.name ?? read.uncertaintyModel?.name ?? "Dashboard";
+}
+
+export function modelCreateRequest(draft: ModelDraft): AppItemCreateRequest {
+  return {
+    kind: APP_ITEM_KINDS.uncertaintyModel,
+    idleExpirySeconds: draft.expiresAfterSeconds,
+    uncertaintyModel: { name: draft.name, ...(draft.description ? { description: draft.description } : {}) },
+  };
 }
 
 export function toDashboard(read: AppItemRead): Dashboard {

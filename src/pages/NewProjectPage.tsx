@@ -1,7 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import type { CreatedState } from "../components/CounterForm";
 import { ExpiryField } from "../components/ExpiryField";
 import { Field } from "../components/Field";
 import { WriteError } from "../components/ItemStates";
@@ -27,7 +26,7 @@ function ProjectForm({ data }: { data: DoneWhenData }) {
   const [expiry, setExpiry] = useState(DEFAULT_EXPIRY_SECONDS);
   const create = useMutation({
     mutationFn: (next: ProjectDraft) => data.createProject(next),
-    onSuccess: (created) => navigate(ownerPath("project", created.ownerToken), { state: { created: true } satisfies CreatedState }),
+    onSuccess: (created) => navigate(ownerPath("project", created.ownerToken)),
   });
   return (
     <form

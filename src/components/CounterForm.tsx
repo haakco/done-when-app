@@ -17,8 +17,8 @@ export type CounterFormValues = { name: string; unit: string; startValue: string
 
 export const EMPTY_COUNTER: CounterFormValues = { name: "", unit: "", startValue: "0", targetValue: "", startedAt: "", deadline: "", history: "" };
 
-/** Owner pages say "your counter is ready" once, after creating it. */
-export type CreatedState = { created: true; rejected?: number };
+/** Router state after creating a counter: how many start or history rows Custd refused. */
+export type CreatedState = { rejected: number };
 
 type CounterFormProps = { data: DoneWhenData; initial?: CounterFormValues; moreOpen?: boolean };
 
@@ -31,7 +31,7 @@ export function CounterForm({ data, initial = EMPTY_COUNTER, moreOpen = false }:
   const [rowErrors, setRowErrors] = useState<CsvRowError[]>([]);
   const create = useMutation({
     mutationFn: (draft: CounterDraft) => data.createCounter(draft, { method, forecastFrom: null }),
-    onSuccess: (created) => navigate(ownerPath("counter", created.ownerToken), { state: { created: true, rejected: created.rejected } satisfies CreatedState }),
+    onSuccess: (created) => navigate(ownerPath("counter", created.ownerToken), { state: { rejected: created.rejected } satisfies CreatedState }),
   });
   const set = (key: keyof CounterFormValues) => (event: { target: { value: string } }) => {
     setForm({ ...form, [key]: event.target.value });
@@ -52,17 +52,15 @@ export function CounterForm({ data, initial = EMPTY_COUNTER, moreOpen = false }:
       <Field label="What are you counting?" hint="For example: pages written, kilometres run, tickets closed.">
         {(control) => <input {...control} required maxLength={255} value={form.name} onChange={set("name")} />}
       </Field>
-      <div className="field-row">
-        <Field label="Target">
-          {(control) => <input {...control} type="number" step="any" inputMode="decimal" required value={form.targetValue} onChange={set("targetValue")} />}
-        </Field>
-        <Field label="Unit" hint="Optional">
-          {(control) => <input {...control} value={form.unit} onChange={set("unit")} />}
-        </Field>
-      </div>
+      <Field label="Target" hint="The number that means done.">
+        {(control) => <input {...control} type="number" step="any" inputMode="decimal" required value={form.targetValue} onChange={set("targetValue")} />}
+      </Field>
       <details className="more" open={moreOpen || rowErrors.length > 0}>
-        <summary>More options: start value, past numbers, deadline</summary>
+        <summary>More options: unit, start value, past numbers, deadline</summary>
         <div className="more__body">
+          <Field label="Unit" hint="Any words, e.g. pages or km. Shown next to the numbers.">
+            {(control) => <input {...control} maxLength={255} value={form.unit} onChange={set("unit")} />}
+          </Field>
           <div className="field-row">
             <Field label="Start value">
               {(control) => <input {...control} type="number" step="any" inputMode="decimal" required value={form.startValue} onChange={set("startValue")} />}

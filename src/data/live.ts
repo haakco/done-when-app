@@ -1,11 +1,11 @@
 // Self-refreshing reads: the SDK's live hooks (conditional polling, paused in hidden tabs) mapped
 // to the shapes the pages render. Several reads of one item combine into one freshness state.
 
-import { APP_LIVE_STATUSES, type AppItemError, type AppItemRead } from "@haakco/custd-sdk/browser";
-import { CUSTD_APP_LIVE_IDLE, type CustdAppLiveResult, useAppForecast, useAppForecastStory, useAppItem } from "@haakco/custd-react";
+import { APP_LIVE_STATUSES, type AppItemError, type AppItemRead, type AppModelRun } from "@haakco/custd-sdk/browser";
+import { CUSTD_APP_LIVE_IDLE, type CustdAppLiveResult, useAppForecast, useAppForecastStory, useAppItem, useAppModelRun } from "@haakco/custd-react";
 import { useMemo } from "react";
-import { toCounter, toDashboard, toProject } from "./mappers";
-import type { Counter, Dashboard, ItemAccess, Project } from "./types";
+import { toCounter, toDashboard, toModel, toProject } from "./mappers";
+import type { Counter, Dashboard, ItemAccess, Model, Project } from "./types";
 
 /** How fresh what is on screen is, worst first: the page shows one line for it. */
 export type Freshness = "fresh" | "stale" | "offline";
@@ -72,4 +72,24 @@ export function projectOf(read: AppItemRead): Project {
 
 export function dashboardOf(read: AppItemRead): Dashboard {
   return toDashboard(read);
+}
+
+export function modelOf(read: AppItemRead): Model {
+  return toModel(read);
+}
+
+/** The model's latest run, kept fresh; null until the first run exists. */
+export function useModelRun(access: ItemAccess, options: Options = {}): LiveView<AppModelRun | null> {
+  const live = useAppModelRun(access, options);
+  const data = dataOf(live);
+  return useMemo((): LiveView<AppModelRun | null> => {
+    if (live.status === APP_LIVE_STATUSES.empty) {
+      return { status: "ready", data: null, freshness: "fresh", lastUpdatedAt: live.lastUpdatedAt, refresh: live.refresh };
+    }
+    if (data === undefined) {
+      if (live.status === APP_LIVE_STATUSES.error || live.status === APP_LIVE_STATUSES.offline) return { status: "error", error: live.error };
+      return { status: "loading" };
+    }
+    return { status: "ready", data, freshness: freshnessOf([live]), lastUpdatedAt: lastUpdatedOf(live), refresh: live.refresh };
+  }, [live, data]);
 }

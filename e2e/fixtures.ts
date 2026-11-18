@@ -37,9 +37,16 @@ export async function createCounter(page: Page, name: string, target: string, hi
   await page.getByLabel("What are you counting?").fill(name);
   await page.getByLabel("Target").fill(target);
   if (history !== undefined) {
-    await page.getByText("More options: start value, past numbers, deadline").click();
+    await page.getByText("More options: unit, start value, past numbers, deadline").click();
     await page.getByLabel("Past numbers (optional)").fill(history);
   }
   await page.getByRole("button", { name: "Create counter" }).click();
   await page.getByRole("heading", { level: 1, name }).waitFor();
+}
+
+/** Presses the Share button beside the title and returns the view-only link it copied. */
+export async function copyShareUrl(page: Page): Promise<string> {
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await page.getByText("View-only link copied.").waitFor();
+  return page.evaluate(() => navigator.clipboard.readText());
 }

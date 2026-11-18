@@ -1,8 +1,8 @@
 /** Typed shapes the pages render, mapped from Custd's app item reads in `mappers.ts`. */
 
-import type { AppForecastMethod, AppItemAccess, AppItemLink, AppItemOwnership, AppLinkRole } from "@haakco/custd-sdk/browser";
+import type { AppForecastMethod, AppItemAccess, AppItemLink, AppItemOwnership, AppLinkRole, AppModelVersion } from "@haakco/custd-sdk/browser";
 
-export type ItemKind = "counter" | "project" | "dashboard";
+export type ItemKind = "counter" | "project" | "model" | "dashboard";
 
 /** Owner links read and change one item; share links only read it. */
 export type Access = AppLinkRole;
@@ -86,6 +86,19 @@ export type Project = ItemMeta & {
   completedAt: string | null;
 };
 
+/** An uncertainty model: quantities whose ranges combine into simulated outputs. */
+export type Model = ItemMeta & {
+  name: string;
+  description: string;
+  /** 0 until a version is saved. */
+  latestVersion: number;
+  version: AppModelVersion | null;
+  /** A run queued by a live input failed; shown until a run succeeds. */
+  queuedRunError: string | null;
+};
+
+export type ModelDraft = { name: string; description: string; expiresAfterSeconds: number };
+
 export type DashboardEntry = { entryUuid: string; itemUuid: string };
 
 export type Dashboard = ItemMeta & { entries: DashboardEntry[] };
@@ -120,4 +133,5 @@ export type ForecastSettings = { method: ForecastMethod; forecastFrom: string | 
 
 export type MeasurementsAdded = { accepted: number; rejected: number; targetReached: boolean };
 
-export type MyItem = { itemUuid: string; kind: "item" | "dashboard"; name: string; status: string; updatedAt: string };
+/** "item" is a counter or a project: Custd's list does not say which until the item is read. */
+export type MyItem = { itemUuid: string; kind: "item" | "model" | "dashboard"; name: string; status: string; updatedAt: string };
