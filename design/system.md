@@ -70,7 +70,14 @@ heavy shadows. The progress bar is a thick rule with a finish tick at the target
 - `--motion-fast` (120ms) for hover and press, `--motion-calm` (280ms) for progress changes,
   both on `--ease`.
 - `prefers-reduced-motion: reduce` sets both to `0ms`; nothing animates on its own then.
-- Celebrations (B6) are brief, can be turned off, and never block reading.
+- Live forecast: when a new forecast arrives, the line and band glide to it in 220ms (the SDK
+  chart adds its 180ms axis ease, so under 400ms in all), then one polite line says how far it
+  moved ("Forecast moved 2 days earlier"). Under reduced motion they jump; the line still shows.
+- Moments: a brief banner when a counter reaches its target or its 90% range moves inside the
+  deadline, seen while the page is open (never on load). With celebrations on it has a one-shot
+  SVG burst; it leaves after 10 s or on "Dismiss". "Celebrations on this device" in the footer
+  (and "Turn off celebrations" on the banner) removes the flourish; the plain message stays.
+- Nudges are owner-only, one line, and "Not now" holds until the next estimate.
 
 ## Components
 
@@ -89,6 +96,12 @@ heavy shadows. The progress bar is a thick rule with a finish tick at the target
 | `ItemStates` | Loading, not-here, read-only, write error and service-unavailable states, each with a next action |
 | `.more` | Disclosure with a finish-colour chevron; 2.75rem tall summary |
 | `DownloadMenu` | Beside Share for every viewer: one "Download" disclosure with "Excel (.xlsx)" (every sheet) and "CSV" (the main table); the result in a polite status line |
+| `ForecastMove` | Polite status line under the counter chart, glyph ↻ plus the words; empty until the forecast moves |
+| `CounterMoments` | Moment banner (`.moment`, `.moment--celebrate` with `.burst`); word and ✓ glyph, never colour alone |
+| `StaleEstimateNudge` | Owner's gentle "estimate is N days old" line with "Add an estimate" and "Not now" |
+| `GuessFirst` / `GuessResults` | Share-page viewers of an active counter guess first (any number of named guesses on the device), or skip; the forecast stays hidden until then. Once done: who was closest, the forecast as shown at the reveal included. Lazy-loaded |
+| `CalibrationCard` | Finished project: ✓/✕ per 90% range and "N of M ranges included the date it was done", in plain words with a small-sample caveat. Lazy-loaded |
+| Big screen (`?tv=1`) | `.page--tv`: no header, footer, actions, disclosures or chart controls; large type; owner tools off; the live line stays. "Leave big screen" appears only on focus |
 | `ImportPanel` | Owner tools "Import …": paste or choose a CSV or .xlsx, then a preview (count, bad rows by line, sample table) and one "Import N …" button |
 
 ## States
@@ -123,4 +136,5 @@ by Custd's share previews (A5). They use the same palette and the serif display 
 | 2026-11-18 | Summary first, one share button, owner tools behind disclosures; the create-counter form lives on the home page. |
 | 2026-11-18 | Share sits beside the title; the owner-link notice shows once per item per device; models are a first-class item kind. |
 | 2026-11-18 | Grid children get `min-width: 0` and controls `width: 100%`, so long option text never widens the page at 400px. |
+| 2026-11-18 | B6: the app eases the forecast's dates itself around the SDK chart; moments fire on transitions seen live; guesses and the celebrations preference stay on the device (no shared guess store yet); big-screen mode is a query flag on any item page. |
 | 2026-11-18 | Downloads are built in the browser; the Excel library loads only on use. The first sheet uses the import's column names, so every download imports back. Imports preview first and send only the good rows. |

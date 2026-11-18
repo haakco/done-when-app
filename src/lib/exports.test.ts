@@ -18,6 +18,7 @@ const counter: Counter = {
   targetValue: 100,
   deadline: null,
   status: "active",
+  completedAt: null,
   measurements: [
     { measuredAt: "2026-11-01T09:00:00.000Z", value: 10 },
     { measuredAt: "2026-11-02T09:30:15.250Z", value: -2.5 },

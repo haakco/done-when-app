@@ -1,7 +1,11 @@
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useLocation } from "react-router";
+import { TV_PARAM, useTvMode } from "../lib/use-motion";
+import { CelebrationsToggle } from "./Moments";
 import { useSession } from "./Session";
 
 export function Layout() {
+  const tv = useTvMode();
+  if (tv) return <BigScreenLayout />;
   return (
     <>
       <a className="skip-link" href="#main">
@@ -32,6 +36,27 @@ export function Layout() {
         </div>
       </header>
       <main id="main" className="page" tabIndex={-1}>
+        <Outlet />
+      </main>
+      <footer className="site-footer">
+        <CelebrationsToggle />
+      </footer>
+    </>
+  );
+}
+
+/** `?tv=1`: no header, footer or controls; one link appears only when focused, to leave. */
+function BigScreenLayout() {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.delete(TV_PARAM);
+  const query = params.toString();
+  return (
+    <>
+      <a className="tv-exit" href={`${location.pathname}${query ? `?${query}` : ""}${location.hash}`}>
+        Leave big screen
+      </a>
+      <main id="main" className="page page--tv" tabIndex={-1}>
         <Outlet />
       </main>
     </>

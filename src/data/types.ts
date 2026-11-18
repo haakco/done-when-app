@@ -51,6 +51,8 @@ export type Counter = ItemMeta & {
   targetValue: number;
   deadline: string | null;
   status: CounterStatus;
+  /** When the target was reached; null while active. */
+  completedAt: string | null;
   measurements: Measurement[];
   /** Custd's read holds the newest measurements only; older ones exist but are not listed. */
   measurementsTruncated: boolean;

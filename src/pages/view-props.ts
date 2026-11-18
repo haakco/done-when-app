@@ -11,4 +11,6 @@ export type ItemViewProps = {
   showOwnerTools: boolean;
   /** The owner route was opened, perhaps with a share link. */
   ownerRoute: boolean;
+  /** `?tv=1`: the big-screen view, no controls and no guessing. */
+  tv: boolean;
 };

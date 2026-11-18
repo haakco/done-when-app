@@ -1,6 +1,7 @@
 import { APP_MEETING_STATUSES, type AppItemRead } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link, useLocation } from "react-router";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { Field } from "../components/Field";
 import { ReadOnlyNotice, WriteError } from "../components/ItemStates";
@@ -20,8 +21,9 @@ import { meetingLine } from "../lib/meeting";
 import { useNow } from "../lib/use-now";
 import type { ItemViewProps } from "./view-props";
 
-export function DashboardView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
+export function DashboardView({ data, access, read, live, showOwnerTools, ownerRoute, tv }: ItemViewProps) {
   const dashboard = dashboardOf(read);
+  const location = useLocation();
   const count = dashboard.entries.length;
   return (
     <article aria-labelledby="item-name" className="item">
@@ -49,6 +51,14 @@ export function DashboardView({ data, access, read, live, showOwnerTools, ownerR
         ))}
       </ul>
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
+      {!tv && count > 0 ? (
+        <p className="big-screen-link">
+          <Link to={{ search: "?tv=1", hash: location.hash }}>
+            <span aria-hidden="true">▣ </span>Big screen
+          </Link>{" "}
+          <span className="muted">for an office TV: large type, updates by itself, no buttons.</span>
+        </p>
+      ) : null}
       {showOwnerTools ? <AddEntryForm data={data} access={access} /> : null}
       {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
       {showOwnerTools ? (

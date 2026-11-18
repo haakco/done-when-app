@@ -8,6 +8,7 @@ import { useItemRead } from "../data/live";
 import { itemKindOf, itemNameOf, KIND_PATH } from "../data/mappers";
 import { rememberRecent } from "../lib/device";
 import { ownerAccessFromHash } from "../lib/links";
+import { useTvMode } from "../lib/use-motion";
 import { CounterView } from "./CounterView";
 import { DashboardView } from "./DashboardView";
 import { MeetingView } from "./MeetingView";
@@ -36,6 +37,7 @@ function ItemPage({ data, access, route }: ItemPageProps) {
   const navigate = useNavigate();
   const { kind: kindSegment } = useParams();
   const location = useLocation();
+  const tv = useTvMode();
   const kind = read.status === "ready" ? itemKindOf(read.data) : null;
   const role = read.status === "ready" ? read.data.item.role : null;
   useEffect(() => {
@@ -43,11 +45,11 @@ function ItemPage({ data, access, route }: ItemPageProps) {
     const segment = KIND_PATH[kind];
     // An owner token pasted into a share path moves into the fragment at once.
     if (route === "share" && role === APP_LINK_ROLES.owner && typeof access === "string") {
-      void navigate(`/edit/${segment}#${access}`, { replace: true });
+      void navigate(`/edit/${segment}${location.search}#${access}`, { replace: true });
     } else if (route === "share" && typeof access === "string" && !location.pathname.startsWith(`/${segment}/`)) {
-      void navigate(`/${segment}/${access}`, { replace: true });
+      void navigate(`/${segment}/${access}${location.search}`, { replace: true });
     } else if (route === "owner" && kindSegment !== segment) {
-      void navigate(`/edit/${segment}${location.hash}`, { replace: true, state: location.state as unknown });
+      void navigate(`/edit/${segment}${location.search}${location.hash}`, { replace: true, state: location.state as unknown });
     }
   }, [kind, role, route, access, kindSegment, location, navigate]);
 
@@ -63,7 +65,8 @@ function ItemPage({ data, access, route }: ItemPageProps) {
 
   if (read.status === "loading") return <Loading what="item" />;
   if (read.status === "error") return <ItemFailed error={read.error} what="item" />;
-  const view = { data, access, read: read.data, live: read, showOwnerTools: route === "owner" && role === APP_LINK_ROLES.owner, ownerRoute: route === "owner" };
+  // Big-screen mode shows the item as any viewer sees it, with no owner tools.
+  const view = { data, access, read: read.data, live: read, showOwnerTools: !tv && route === "owner" && role === APP_LINK_ROLES.owner, ownerRoute: !tv && route === "owner", tv };
   if (kind === "dashboard") return <DashboardView {...view} />;
   if (kind === "project") return <ProjectView {...view} />;
   if (kind === "model") return <ModelView {...view} />;

@@ -93,6 +93,7 @@ export function toCounter(
     targetValue: project.target?.targetValue ?? 0,
     deadline: project.target?.targetDate ?? null,
     status: project.target?.state === COMPLETED || project.status === COMPLETED ? "completed" : "active",
+    completedAt: project.target?.completedAt ?? project.delivery.completedAt ?? null,
     measurements,
     measurementsTruncated: storyTruncated && measurements.length >= STORY_MEASUREMENT_LIMIT,
     startValue: measurements[0]?.value ?? 0,

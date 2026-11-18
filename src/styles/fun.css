@@ -1,0 +1,122 @@
+/* B6: live forecast, moments, big-screen mode. Tokens only; see design/system.md → Motion. */
+
+.forecast-move {
+  min-height: 0;
+  margin: 0;
+  color: var(--color-forecast);
+  font-weight: 600;
+}
+
+.forecast-move:empty { display: none; }
+
+.moment-slot .moment__text:empty { display: none; }
+
+.moment {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: var(--border);
+  border-left: 4px solid var(--color-done);
+  border-radius: var(--radius);
+}
+
+.moment__text {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.moment__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.moment__actions .button { padding-inline: var(--space-2); }
+
+.moment--celebrate { animation: moment-in calc(var(--motion-calm) * 1.5) var(--ease) both; }
+
+.burst {
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  overflow: visible;
+}
+
+.burst__ray {
+  stroke: var(--color-finish);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 16;
+  stroke-dashoffset: 0;
+  animation: burst-out calc(var(--motion-calm) * 3) var(--ease) both;
+}
+
+.burst__ray--forecast { stroke: var(--color-forecast); animation-delay: calc(var(--motion-fast) / 2); }
+
+@keyframes moment-in {
+  from { transform: translateY(-0.4rem); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes burst-out {
+  from { stroke-dashoffset: 16; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Zeroed duration tokens already stop these; this also skips the first frame. */
+@media (prefers-reduced-motion: reduce) {
+  .moment--celebrate,
+  .burst__ray { animation: none; }
+}
+
+.nudge p { margin-bottom: var(--space-3); }
+
+.site-footer {
+  max-width: var(--width-page);
+  margin: var(--space-8) auto 0;
+  padding: var(--space-4);
+  border-top: var(--border);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.celebrations-toggle { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 2.75rem; cursor: pointer; }
+.celebrations-toggle input { width: 1.25rem; height: 1.25rem; accent-color: var(--color-finish); }
+
+/* Big-screen mode (?tv=1): large type, no controls; the live line stays because it is state. */
+main.page--tv {
+  max-width: none;
+  padding: var(--space-8) clamp(var(--space-4), 4vw, var(--space-12));
+  font-size: clamp(1.1rem, 1.6vw, 1.6rem);
+}
+
+.page--tv h1 { font-size: clamp(2.4rem, 4.5vw, 4.5rem); }
+.page--tv .summary__headline { font-size: clamp(3rem, 7vw, 7rem); }
+.page--tv .summary__detail { font-size: clamp(1.3rem, 2.4vw, 2.2rem); }
+.page--tv .dashboard-grid { grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: var(--space-6); }
+.page--tv .entry__name { font-size: clamp(1.5rem, 2.6vw, 2.4rem); }
+.page--tv .entry__headline { font-size: clamp(1.6rem, 3vw, 2.8rem); }
+
+.page--tv .item__head .item__actions,
+.page--tv .more,
+.page--tv .owner-notice,
+.page--tv .rate-line select,
+.page--tv .entry .button--quiet,
+.page--tv .moment__actions,
+.page--tv .chart [data-custd-chart-controls] { display: none; }
+
+.tv-exit {
+  position: absolute;
+  left: var(--space-4);
+  top: -3rem;
+  background: var(--color-surface);
+  padding: var(--space-2) var(--space-4);
+  z-index: 1;
+}
+
+.tv-exit:focus { top: var(--space-2); }
+
+.big-screen-link { font-size: var(--text-sm); }

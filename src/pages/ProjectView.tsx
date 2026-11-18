@@ -1,12 +1,13 @@
 import { ConvergenceStory } from "@haakco/custd-react";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { AlertsPanel } from "../components/AlertsPanel";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { ImportPanel } from "../components/ImportPanel";
 import { Field } from "../components/Field";
 import { ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
+import { StaleEstimateNudge } from "../components/Moments";
 import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
 import { ItemHeader } from "../components/ItemHeader";
 import { StatusBadge } from "../components/StatusBadge";
@@ -21,6 +22,8 @@ import type { ItemViewProps } from "./view-props";
 
 /** An estimate older than this is marked stale. */
 export const STALE_AFTER_DAYS = 14;
+
+const CalibrationCard = lazy(() => import("../components/Calibration").then((module) => ({ default: module.CalibrationCard })));
 
 export function ProjectView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
   const project = projectOf(read);
@@ -53,7 +56,13 @@ export function ProjectView({ data, access, read, live, showOwnerTools, ownerRou
           <span className="muted">Done when: {project.definitionOfDone || "not written yet"}</span>
         </p>
       </section>
+      {showOwnerTools ? <StaleEstimateNudge project={project} staleAfterDays={STALE_AFTER_DAYS} /> : null}
       {showOwnerTools && project.status === "active" ? <EstimateForm data={data} access={access} /> : null}
+      {project.status === "completed" && project.completedAt && project.estimates.length > 0 ? (
+        <Suspense fallback={null}>
+          <CalibrationCard project={project} />
+        </Suspense>
+      ) : null}
       <figure className="chart" aria-label="Estimate convergence">
         <ConvergenceStory
           estimates={project.estimates}

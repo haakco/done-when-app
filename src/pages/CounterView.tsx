@@ -1,12 +1,14 @@
 import { ArrivalHistogram, ForecastChart } from "@haakco/custd-react";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useId, useState } from "react";
+import { lazy, Suspense, useCallback, useId, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { AlertsPanel } from "../components/AlertsPanel";
 import type { CreatedState, CounterFormValues } from "../components/CounterForm";
 import { Field } from "../components/Field";
 import { ItemFailed, Loading, ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
+import { ForecastMove, useGlidingForecast } from "../components/LiveForecast";
+import { CounterMoments } from "../components/Moments";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { ImportPanel } from "../components/ImportPanel";
 import { AddMeasurementForm } from "../components/MeasurementForms";
@@ -22,18 +24,26 @@ import { counterWorkbook } from "../lib/exports";
 import { counterSummary } from "../lib/forecast-text";
 import { MAX_ITEM_MEASUREMENTS, parseMeasurementTable } from "../lib/imports";
 import { formatRate, RATE_UNITS, ratePerSecond, type RateUnit } from "../lib/rate";
+import { forecastDates, type ForecastDates } from "../lib/moments";
+import { useGuessBook } from "../lib/use-guess-book";
 import { useNarrow } from "../lib/use-narrow";
 import type { NewRunState } from "./NewCounterPage";
 import type { ItemViewProps } from "./view-props";
 
-export function CounterView({ data, access, read, showOwnerTools, ownerRoute }: ItemViewProps) {
+const GuessFirst = lazy(() => import("../components/GuessFirst").then((module) => ({ default: module.GuessFirst })));
+const GuessResults = lazy(() => import("../components/GuessFirst").then((module) => ({ default: module.GuessResults })));
+
+export function CounterView({ data, access, read, showOwnerTools, ownerRoute, tv }: ItemViewProps) {
   const live = useCounter(access, read);
+  const book = useGuessBook(read.item.itemUuid);
   const location = useLocation();
   const rejectedAtCreate = (location.state as Partial<CreatedState> | null)?.rejected ?? 0;
   if (live.status === "loading") return <Loading what="counter" />;
   if (live.status === "error") return <ItemFailed error={live.error} what="counter" />;
   const counter = live.data;
   const summary = counterSummary(counter);
+  // A share-page viewer may guess before the forecast shows; owners, TVs and done counters never wait.
+  const guessing = !ownerRoute && !tv && counter.status === "active" && !book.revealed;
   return (
     <article aria-labelledby="item-name" className="item">
       <ItemHeader
@@ -58,42 +68,80 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute }: 
           {rejectedAtCreate} of your past numbers were not accepted. Add them again under &ldquo;Import measurements&rdquo;.
         </p>
       ) : null}
+      <CounterMoments counter={counter} />
       <section className="summary" aria-label="Summary">
-        <p className="summary__headline">{summary.headline}</p>
-        {summary.detail ? <p className="summary__detail">{summary.detail}</p> : null}
+        {guessing ? (
+          <Suspense fallback={null}>
+            <GuessFirst itemUuid={counter.itemUuid} book={book} forecastMedian={counter.forecast?.completionMedian ?? null} />
+          </Suspense>
+        ) : (
+          <>
+            <p className="summary__headline">{summary.headline}</p>
+            {summary.detail ? <p className="summary__detail">{summary.detail}</p> : null}
+          </>
+        )}
         <Progress label="Progress to target" current={counter.latestValue} start={counter.startValue} target={counter.targetValue} unit={counter.unit} />
         <RateLine measurements={counter.measurements} unit={counter.unit} />
+        {!guessing && !tv && book.guesses.length > 0 ? (
+          <Suspense fallback={null}>
+            <GuessResults book={book} completedAt={counter.status === "completed" ? counter.completedAt : null} />
+          </Suspense>
+        ) : null}
       </section>
       {showOwnerTools ? <QuickAdd data={data} access={access} counter={counter} /> : null}
-      <CounterChart counter={counter} />
+      <LiveCounterChart counter={counter} hideForecast={guessing} />
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
-      <ForecastDetail counter={counter} />
+      {guessing ? null : <ForecastDetail counter={counter} />}
       {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
       {showOwnerTools ? <CounterOwnerTools data={data} access={access} counter={counter} /> : null}
     </article>
   );
 }
 
-function CounterChart({ counter, detail = false }: { counter: Counter; detail?: boolean }) {
+/** The main chart: the forecast glides to each new position and says how far it moved. */
+function LiveCounterChart({ counter, hideForecast }: { counter: Counter; hideForecast: boolean }) {
+  const { shown, moving, announcement } = useGlidingForecast(forecastDates(counter.forecast));
+  return (
+    <>
+      <CounterChart counter={counter} dates={hideForecast ? null : shown} moving={moving} />
+      <ForecastMove text={hideForecast || counter.status === "completed" ? "" : announcement} />
+    </>
+  );
+}
+
+type ChartProps = { counter: Counter; detail?: boolean; dates?: ForecastDates | null; moving?: boolean };
+
+/** `dates` replaces the forecast's dates (null hides the forecast); the detail chart draws them as they are. */
+function CounterChart({ counter, detail = false, dates = forecastDates(counter.forecast), moving = false }: ChartProps) {
   const narrow = useNarrow();
   const forecast = counter.forecast;
+  const iso = (epoch: number | null | undefined) => (epoch == null ? null : new Date(epoch).toISOString());
+  const median = iso(dates?.median);
+  const low = iso(dates?.low);
+  const high = iso(dates?.high);
   const chartData = {
     observations: counter.measurements.map((measurement) => ({ at: measurement.measuredAt, value: measurement.value })),
     target: counter.targetValue,
     ...(counter.deadline ? { deadline: counter.deadline } : {}),
-    ...(forecast?.completionMedian ? { completionMedian: forecast.completionMedian } : {}),
-    ...(forecast?.completionLow && forecast.completionHigh
-      ? { completionInterval: { confidence: 0.9, lower: forecast.completionLow, upper: forecast.completionHigh } }
-      : {}),
+    ...(median ? { completionMedian: median } : {}),
+    ...(low && high ? { completionInterval: { confidence: 0.9, lower: low, upper: high } } : {}),
     ...(forecast?.forecastFrom ? { forecastFrom: forecast.forecastFrom } : {}),
     ...(detail && forecast ? { posteriorLines: forecast.posteriorLines } : {}),
   };
   return (
-    <figure className="chart" aria-label={detail ? "Forecast with sample paths" : "Forecast chart"}>
+    <figure
+      className="chart"
+      aria-label={detail ? "Forecast with sample paths" : "Forecast chart"}
+      data-forecast-median={median ?? ""}
+      data-forecast-motion={moving ? "moving" : "still"}
+    >
       <ForecastChart
         data={chartData}
         title={detail ? `${counter.name}: possible paths` : counter.name}
-        labels={{ empty: "The chart appears after the first measurement.", noForecast: "The forecast line appears after three measurements." }}
+        labels={{
+          empty: "The chart appears after the first measurement.",
+          noForecast: dates === null ? "The forecast shows after you guess or skip." : "The forecast line appears after three measurements.",
+        }}
         formatValue={(value) => value.toLocaleString("en", { maximumFractionDigits: 1 })}
         formatDate={formatShortDate}
         {...(narrow ? { width: 380, height: 260 } : {})}
@@ -194,11 +242,6 @@ function QuickAdd({ data, access, counter }: { data: DoneWhenData; access: ItemA
       {add.data && add.data.rejected > 0 ? (
         <p className="field__error" role="alert">
           Custd did not accept {add.data.rejected === 1 ? "that measurement" : `${add.data.rejected} measurements`}. Check the value and try again.
-        </p>
-      ) : null}
-      {add.data?.targetReached ? (
-        <p className="notice notice--done" role="status">
-          <span aria-hidden="true">✓ </span>Target reached. Well done.
         </p>
       ) : null}
     </section>
