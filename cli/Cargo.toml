@@ -1,0 +1,31 @@
+[package]
+name = "done-when"
+version = "0.1.0"
+edition = "2024"
+description = "Done When on the command line: counters, forecasts, a live terminal view and an MCP server."
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "done-when"
+path = "src/main.rs"
+
+[dependencies]
+# TEMPORARY: switch to the released tag before pushing:
+# custd-sdk = { git = "https://github.com/haakco/custd-sdk", tag = "v3.46.0" }
+custd-sdk = { path = "../../custd-sdk/sdk-rust" }
+clap = { version = "4.6.8", default-features = false, features = ["std", "derive", "env", "help", "usage", "error-context"] }
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
+ratatui-image = { version = "11.1.0", default-features = false, features = ["crossterm"] }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+# The same version and features the SDK uses, for the discovery file and the share-card image.
+ureq = { version = "3.5.2", default-features = false, features = ["rustls"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
