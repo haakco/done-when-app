@@ -23,7 +23,8 @@ const COMPLETION_INCREASE: &str = "increase";
 const SOURCE_MANUAL: &str = "manual";
 const TARGET_CODE: &str = "done";
 const TARGET_ACTIVE: &str = "active";
-const DEFAULT_UNIT: &str = "unitless";
+/// Custd's unit slugs are a closed lookup table, so a counter's free-text unit is its series name.
+const UNIT_SLUG: &str = "unitless";
 const ROLE_OWNER: &str = "owner";
 const SIGN_IN_SCOPES: [&str; 3] = ["openid", "profile", "offline_access"];
 
@@ -338,11 +339,8 @@ fn counter_project(draft: &CounterDraft, deadline: Option<String>) -> AppMeasure
         description: None,
         series: vec![MeasurementSeriesCreate {
             series_code: SERIES_CODE.to_owned(),
-            name: draft.name.clone(),
-            unit_slug: draft
-                .unit
-                .clone()
-                .unwrap_or_else(|| DEFAULT_UNIT.to_owned()),
+            name: draft.unit.clone().unwrap_or_else(|| draft.name.clone()),
+            unit_slug: UNIT_SLUG.to_owned(),
             completion_direction: COMPLETION_INCREASE.to_owned(),
             source: SOURCE_MANUAL.to_owned(),
         }],
@@ -435,7 +433,12 @@ fn add_rows(
     let mut store = ctx.load_store()?;
     store.record_measurements(&ctx.host, item_uuid, &accepted);
     ctx.save_store(&store)?;
-    let run = link.run_forecast(&MeasurementForecastRunRequest::default())?;
+    let run = link
+        .run_forecast(&MeasurementForecastRunRequest::default())
+        .map_err(|error| CliError::ForecastAfterWrite {
+            accepted: import.accepted,
+            error,
+        })?;
     Ok(AddReport {
         item_uuid: item_uuid.to_owned(),
         accepted: import.accepted,
@@ -508,6 +511,12 @@ pub fn show(ctx: &Context, reference: &str) -> CliResult<ItemReport> {
     Ok(item_report(&read, kind, resolved.stored.as_ref(), forecast))
 }
 
+/// The counter's unit: its series name, when that is not just the counter's name.
+pub fn unit_label(project: &custd_sdk::MeasurementProject) -> Option<String> {
+    let series = project.series.first()?;
+    (series.name != project.name).then(|| series.name.clone())
+}
+
 pub fn item_report(
     read: &AppItemRead,
     kind: ItemKind,
@@ -527,9 +536,7 @@ pub fn item_report(
         access: read.item.role.clone(),
         status: project.map_or_else(|| "active".to_owned(), |p| p.status.clone()),
         target_value: target.map(|t| t.target_value),
-        unit: project
-            .and_then(|p| p.series.first())
-            .map(|s| s.unit_slug.clone()),
+        unit: project.and_then(unit_label),
         deadline: target
             .and_then(|t| t.target_date.clone())
             .or_else(|| project.and_then(|p| p.delivery.target_date.clone())),

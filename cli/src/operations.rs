@@ -85,24 +85,3 @@ pub const OPERATIONS: &[(&str, Coverage)] = &[
 
 /// Public SDK functions that build clients rather than call the API.
 pub const NOT_OPERATIONS: &[&str] = &["AppClient::new", "AppClient::link", "CustdClient::new"];
-
-/// App API operations Done When needs that the SDK does not expose yet.
-pub const SDK_GAPS: &[(&str, &str)] = &[
-    (
-        "listAppItems",
-        "`list` for a signed-in user (\"my items\"); `list` shows local items meanwhile",
-    ),
-    ("claimAppItem", "claiming an anonymous item after `login`"),
-    (
-        "user access token on item routes",
-        "creating and reading items as the signed-in user",
-    ),
-    (
-        "app forecast story",
-        "the live view's measurement history; it shows measurements added here meanwhile",
-    ),
-    (
-        "hosted app discovery",
-        "reading /.well-known/custd.json; the CLI reads it itself",
-    ),
-];

@@ -45,7 +45,7 @@ fn watch_polls_conditionally_and_renders_with_and_without_an_image() {
     );
     run(&api.base_url, &dir, &["add", "Pages", "40"], "");
 
-    let ctx = Context::new(&api.base_url, dir);
+    let ctx = Context::new(&api.base_url, dir.to_path_buf());
     let mut model = WatchModel {
         card_url: Some(format!("{}/card.png", api.base_url)),
         ..WatchModel::default()

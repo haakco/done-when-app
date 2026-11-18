@@ -75,17 +75,16 @@ fn an_agent_adds_a_measurement_and_reads_the_new_forecast() {
 }
 
 #[test]
-fn discover_and_unknown_methods() {
+fn version_fallback_and_protocol_errors() {
     let api = FakeApi::start();
     let lines = vec![
-        json!({ "jsonrpc": "2.0", "id": "d", "method": "server/discover", "params": { "_meta": {
-            "io.modelcontextprotocol/protocolVersion": "2026-07-28", "io.modelcontextprotocol/clientCapabilities": {} } } })
-        .to_string(),
+        json!({ "jsonrpc": "2.0", "id": "a", "method": "initialize", "params": { "protocolVersion": "1999-01-01" } })
+            .to_string(),
         json!({ "jsonrpc": "2.0", "id": 2, "method": "resources/list" }).to_string(),
         "not json".to_owned(),
     ];
     let replies = serve(&api, &temp_config_dir(), &lines);
-    assert_eq!(replies[0]["result"]["supportedVersions"][0], "2026-07-28");
+    assert_eq!(replies[0]["result"]["protocolVersion"], "2025-11-25");
     assert_eq!(replies[1]["error"]["code"], -32601);
     assert_eq!(replies[2]["error"]["code"], -32700);
 }

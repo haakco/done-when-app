@@ -8,8 +8,13 @@ pub enum CliError {
     Sdk(custd_sdk::Error),
     /// The app's discovery file or share card could not be read.
     Fetch(String),
-    /// The local store could not be read or written.
-    Store(io::Error),
+    /// The local store, a file or the terminal could not be read or written.
+    Io(io::Error),
+    /// Measurements were stored, then the forecast run failed.
+    ForecastAfterWrite {
+        accepted: i64,
+        error: custd_sdk::Error,
+    },
     /// The input cannot be used.
     Usage(String),
     /// The item was opened with a share link, which only reads.
@@ -25,7 +30,12 @@ impl fmt::Display for CliError {
         match self {
             CliError::Sdk(error) => write!(f, "{error}"),
             CliError::Fetch(message) => write!(f, "{message}"),
-            CliError::Store(error) => write!(f, "local store: {error}"),
+            CliError::Io(error) => write!(f, "{error}"),
+            CliError::ForecastAfterWrite { accepted, error } => write!(
+                f,
+                "{accepted} measurement(s) were stored, but the forecast run failed ({error}); \
+                 do not add them again: the next `add` or the web page reruns the forecast"
+            ),
             CliError::Usage(message) => write!(f, "{message}"),
             CliError::ReadOnly => f.write_str(
                 "this is a read-only share link; use the owner link (or the name of an item made here) to change it",
@@ -48,7 +58,7 @@ impl From<custd_sdk::Error> for CliError {
 
 impl From<io::Error> for CliError {
     fn from(error: io::Error) -> Self {
-        CliError::Store(error)
+        CliError::Io(error)
     }
 }
 

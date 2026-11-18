@@ -32,6 +32,7 @@ struct Item {
     uuid: String,
     kind: String,
     name: String,
+    unit: String,
     version: i64,
     measurements: Vec<f64>,
     forecast_version: Option<i64>,
@@ -81,8 +82,23 @@ impl FakeApi {
     }
 }
 
-/// A fresh, empty config directory per test.
-pub fn temp_config_dir() -> PathBuf {
+/// A fresh, empty config directory, removed when the test ends.
+pub struct TempDir(PathBuf);
+
+impl std::ops::Deref for TempDir {
+    type Target = std::path::Path;
+    fn deref(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+pub fn temp_config_dir() -> TempDir {
     static NEXT: AtomicUsize = AtomicUsize::new(0);
     let dir = std::env::temp_dir().join(format!(
         "done-when-test-{}-{}",
@@ -90,7 +106,7 @@ pub fn temp_config_dir() -> PathBuf {
         NEXT.fetch_add(1, Ordering::SeqCst)
     ));
     let _ = std::fs::remove_dir_all(&dir);
-    dir
+    TempDir(dir)
 }
 
 fn token_index(request: &Received) -> Option<(usize, bool)> {
@@ -135,6 +151,10 @@ fn create(state: &mut State, request: &Received) -> (u16, Option<String>, String
             .as_str()
             .unwrap_or("")
             .to_owned(),
+        unit: body["measurementProject"]["series"][0]["name"]
+            .as_str()
+            .unwrap_or("")
+            .to_owned(),
         kind,
         version: 1,
         status: "active".to_owned(),
@@ -166,6 +186,7 @@ fn route(
                 json!({ "importId": "imp-1", "accepted": rows.len(), "rejected": 0, "results": results }),
             )
         }
+        ("POST", "/api/v1/app/forecast/runs") if item.name == "Flaky" => problem(500, "internal"),
         ("POST", "/api/v1/app/forecast/runs") => {
             item.version += 1;
             item.forecast_version = Some(item.version);
@@ -236,7 +257,7 @@ fn item_read(item: &Item, owner: bool) -> Value {
     read["measurementProject"] = json!({
         "projectUuid": "p-1", "projectCode": "app-1", "kind": "deadline_forecast", "status": item.status,
         "name": item.name, "description": "",
-        "series": [{ "seriesUuid": "series-1", "seriesCode": "value", "name": item.name, "unitSlug": "pages",
+        "series": [{ "seriesUuid": "series-1", "seriesCode": "value", "name": item.unit, "unitSlug": "unitless",
             "completionDirection": "increase", "source": "manual" }],
         "target": { "targetUuid": "t-1", "targetCode": "done", "name": item.name, "targetValue": 100.0,
             "targetDate": "2026-12-01T00:00:00Z", "completedAt": null, "state": "active" },

@@ -51,11 +51,7 @@ impl Report for ItemReport {
             self.access
         )];
         if let Some(target) = self.target_value {
-            let unit = self
-                .unit
-                .as_deref()
-                .filter(|u| *u != "unitless")
-                .unwrap_or("");
+            let unit = self.unit.as_deref().unwrap_or("");
             lines.push(format!("Target: {target} {unit}").trim_end().to_owned());
         }
         if let Some(deadline) = &self.deadline {

@@ -45,12 +45,7 @@ impl WatchModel {
     pub fn apply_item(&mut self, read: &AppItemRead) {
         if let Some(project) = &read.measurement_project {
             self.name = project.name.clone();
-            self.unit = project
-                .series
-                .first()
-                .map(|s| s.unit_slug.clone())
-                .filter(|u| u != "unitless")
-                .unwrap_or_default();
+            self.unit = ops::unit_label(project).unwrap_or_default();
             self.target = project.target.as_ref().map(|t| t.target_value);
             self.deadline = project.target.as_ref().and_then(|t| t.target_date.clone());
         }

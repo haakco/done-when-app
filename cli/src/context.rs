@@ -25,8 +25,6 @@ pub type LoginRunner = fn(&DeviceLogin, &mut dyn Write) -> custd_sdk::Result<Dev
 pub struct Discovery {
     pub api_base_url: String,
     pub browser_key: String,
-    #[serde(default)]
-    pub capabilities: Vec<String>,
     pub sign_in: Option<DiscoverySignIn>,
 }
 
@@ -59,11 +57,18 @@ impl Context {
     }
 
     pub fn load_store(&self) -> CliResult<Store> {
-        Ok(Store::load(&self.config_dir)?)
+        Store::load(&self.config_dir).map_err(|e| self.store_error(e))
     }
 
     pub fn save_store(&self, store: &Store) -> CliResult<()> {
-        Ok(store.save(&self.config_dir)?)
+        store
+            .save(&self.config_dir)
+            .map_err(|e| self.store_error(e))
+    }
+
+    fn store_error(&self, error: std::io::Error) -> CliError {
+        let message = format!("local store in {}: {error}", self.config_dir.display());
+        CliError::Io(std::io::Error::new(error.kind(), message))
     }
 
     pub fn discovery(&self) -> CliResult<&Discovery> {

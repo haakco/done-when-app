@@ -11,9 +11,9 @@ use crate::context::Context;
 use crate::error::{CliError, CliResult};
 use crate::ops::{self, CounterDraft};
 
-/// Newest first; `server/discover` lists them all, `initialize` echoes a supported request.
-const SUPPORTED_VERSIONS: [&str; 4] = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26"];
-const LEGACY_DEFAULT_VERSION: &str = "2025-11-25";
+/// `initialize` echoes a supported version and answers the newest otherwise. 2026-07-28
+/// (per-request `_meta`, `server/discover`, cache hints) is not implemented.
+const SUPPORTED_VERSIONS: [&str; 3] = ["2025-11-25", "2025-06-18", "2025-03-26"];
 const INSTRUCTIONS: &str = "Track work as Done When counters. create_counter returns an itemUuid; \
 pass it as `item` to add_measurement and read_forecast. Owner links stay on this machine and are never returned.";
 
@@ -52,7 +52,6 @@ pub fn handle_line(ctx: &Context, line: &str) -> Option<Value> {
     let params = message.get("params").cloned().unwrap_or(Value::Null);
     Some(match method {
         "initialize" => result_reply(id, initialize(&params)),
-        "server/discover" => result_reply(id, discover()),
         "ping" => result_reply(id, json!({})),
         "tools/list" => result_reply(id, json!({ "tools": tool_definitions() })),
         "tools/call" => match call_tool(ctx, &params) {
@@ -75,18 +74,9 @@ fn initialize(params: &Value) -> Value {
     let requested = params.get("protocolVersion").and_then(Value::as_str);
     let version = requested
         .filter(|v| SUPPORTED_VERSIONS.contains(v))
-        .unwrap_or(LEGACY_DEFAULT_VERSION);
+        .unwrap_or(SUPPORTED_VERSIONS[0]);
     json!({
         "protocolVersion": version,
-        "capabilities": capabilities(),
-        "serverInfo": server_info(),
-        "instructions": INSTRUCTIONS,
-    })
-}
-
-fn discover() -> Value {
-    json!({
-        "supportedVersions": SUPPORTED_VERSIONS,
         "capabilities": capabilities(),
         "serverInfo": server_info(),
         "instructions": INSTRUCTIONS,

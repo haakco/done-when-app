@@ -37,6 +37,8 @@ fn counter_journey_keeps_the_owner_link_private() {
     assert_eq!(code, 0, "{err}");
     assert!(out.contains("Added 1 measurement"), "{out}");
     assert!(out.contains("50% chance by the deadline"), "{out}");
+    let (_, out, _) = run(base, &dir, &["show", "Pages"], "");
+    assert!(out.contains("Target: 100 pages"), "{out}");
 
     let (code, out, _) = run(
         base,
@@ -177,7 +179,7 @@ fn login_saves_the_session_without_printing_it() {
         "login",
     ])
     .unwrap();
-    let mut ctx = done_when::context::Context::new(&api.base_url, dir.clone());
+    let mut ctx = done_when::context::Context::new(&api.base_url, dir.to_path_buf());
     ctx.login_runner = |login, _| {
         assert_eq!(
             (login.client_id.as_str(), login.audience.as_deref()),
@@ -213,5 +215,23 @@ fn login_saves_the_session_without_printing_it() {
     assert_eq!(
         serde_json::from_str::<Value>(&out).unwrap()["signedIn"],
         true
+    );
+}
+
+#[test]
+fn a_failed_forecast_says_the_measurement_was_stored() {
+    let api = FakeApi::start();
+    let dir = temp_config_dir();
+    run(
+        &api.base_url,
+        &dir,
+        &["new", "counter", "--name", "Flaky", "--target", "10"],
+        "",
+    );
+    let (code, _, err) = run(&api.base_url, &dir, &["add", "Flaky", "2"], "");
+    assert_eq!(code, 1);
+    assert!(
+        err.contains("1 measurement(s) were stored") && err.contains("do not add them again"),
+        "{err}"
     );
 }
