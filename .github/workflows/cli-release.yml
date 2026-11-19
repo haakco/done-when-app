@@ -18,7 +18,7 @@ jobs:
           - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, archive: tar.gz }
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, archive: tar.gz }
           - { os: macos-latest, target: aarch64-apple-darwin, archive: tar.gz }
-          - { os: macos-latest, target: x86_64-apple-darwin, archive: tar.gz }
+          - { os: macos-15-intel, target: x86_64-apple-darwin, archive: tar.gz }
           - { os: windows-latest, target: x86_64-pc-windows-msvc, archive: zip }
     runs-on: ${{ matrix.os }}
     defaults:
@@ -31,18 +31,35 @@ jobs:
       - run: cargo test --locked
         if: matrix.target == 'x86_64-unknown-linux-gnu'
       - run: cargo build --locked --release --target ${{ matrix.target }}
-      - name: Package
+      - name: Package and smoke-test the archive
+        env:
+          TARGET: ${{ matrix.target }}
+          FORMAT: ${{ matrix.archive }}
         run: |
-          name="done-when-${GITHUB_REF_NAME#cli-}-${{ matrix.target }}"
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#cli-}"
+          name="done-when-$version-$TARGET"
+          binary=done-when
+          if [[ "$FORMAT" == zip ]]; then binary="$binary.exe"; fi
+
           mkdir "$name"
-          cp target/${{ matrix.target }}/release/done-when* "$name/"
-          rm -f "$name"/*.d "$name"/*.pdb
-          if [ "${{ matrix.archive }}" = zip ]; then 7z a "$name.zip" "$name"; else tar czf "$name.tar.gz" "$name"; fi
-          echo "ARCHIVE=cli/$name.${{ matrix.archive }}" >> "$GITHUB_ENV"
+          cp "target/$TARGET/release/$binary" "$name/"
+          mkdir verify
+          if [[ "$FORMAT" == zip ]]; then
+            7z a "$name.zip" "$name/"
+            7z x "$name.zip" -overify
+          else
+            tar czf "$name.tar.gz" "$name/"
+            tar xzf "$name.tar.gz" -C verify
+          fi
+          test "$(verify/"$name"/"$binary" --version)" = "done-when ${version#v}"
+          verify/"$name"/"$binary" --help >/dev/null
+          echo "ARCHIVE=cli/$name.$FORMAT" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
           path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
 
   release:
     needs: build
@@ -54,6 +71,9 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Generate release checksums
+        working-directory: dist
+        run: sha256sum -- *.tar.gz *.zip > SHA256SUMS
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
