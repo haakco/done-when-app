@@ -113,6 +113,19 @@ function PlanContent({ data, access, read, live, showOwnerTools, plan }: ItemVie
         </ol>
         {!showOwnerTools ? <DependencyCanvas parts={plan.parts} names={names} inspect={inspect} access={access} /> : null}
       </section>
+      {read.planMeetingSummaries?.length ? (
+        <section className="section" aria-labelledby="plan-meeting-updates">
+          <h2 id="plan-meeting-updates">Meeting updates</h2>
+          <ul className="item-list">
+            {read.planMeetingSummaries.map((meeting) => (
+              <li className="card" key={meeting.meetingUuid}>
+                <h3>{meeting.name}</h3>
+                <p>{meeting.summary}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {showOwnerTools ? (
         <>
           <PlanEditor key={plan.revision} plan={plan} names={names} inspect={inspect} readPart={(pasted) => data.readPlanPart(pasted)} save={async (update) => {

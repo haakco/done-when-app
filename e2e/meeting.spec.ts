@@ -102,12 +102,14 @@ test("save private minutes with an action linked to a plan part", async ({ page,
   await page.getByRole("button", { name: "Save plan" }).click();
   await expect(page.getByText("0 of 1 required parts complete")).toBeVisible();
 
+  const planShareUrl = await copyShareUrl(page);
   await buildAgenda(page);
   const shareUrl = await copyShareUrl(page);
   await page.getByText("Private meeting minutes", { exact: true }).click();
   await page.getByLabel("Minutes", { exact: true }).fill("Review the launch checklist");
   await page.getByLabel("Decisions").fill("Publish after sign-off");
   await page.getByLabel("Related plan").selectOption({ label: "Launch the new site" });
+  await page.getByLabel("Summary for plan viewers").fill("The launch checklist is ready for review.");
   await page.getByRole("button", { name: "Add action" }).click();
   await page.getByLabel("Description").fill("Finish the edited pages");
   await expect(page.getByRole("option", { name: "Pages edited" })).toBeAttached();
@@ -125,6 +127,9 @@ test("save private minutes with an action linked to a plan part", async ({ page,
     await display.goto(`${shareUrl}?tv=1`);
     await expect(display.getByRole("heading", { name: "Weekly sync" })).toBeVisible();
     await expect(display.getByText("Private meeting minutes")).toHaveCount(0);
+    await expect(display.getByText("Publish after sign-off")).toHaveCount(0);
+    await display.goto(planShareUrl);
+    await expect(display.getByText("The launch checklist is ready for review.")).toBeVisible();
     await expect(display.getByText("Publish after sign-off")).toHaveCount(0);
   } finally {
     await viewer.close();

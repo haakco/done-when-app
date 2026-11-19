@@ -16,6 +16,7 @@ type MinutesProps = {
 
 export function MeetingMinutes({ saved, revision, save }: MinutesProps) {
   const [minutes, setMinutes] = useState(saved?.minutes ?? "");
+  const [sharedSummary, setSharedSummary] = useState(saved?.sharedSummary ?? "");
   const [decisions, setDecisions] = useState(saved?.decisions ?? "");
   const [actions, setActions] = useState<AppMeetingAction[]>(saved?.actions ?? []);
   const [plan, setPlan] = useState(saved?.planUuid ?? "");
@@ -31,6 +32,7 @@ export function MeetingMinutes({ saved, revision, save }: MinutesProps) {
 
   function switchPlan(id: string) {
     setPlan(id);
+    setSharedSummary("");
     setActions(actions.map(({ description }) => ({ description })));
   }
 
@@ -44,7 +46,7 @@ export function MeetingMinutes({ saved, revision, save }: MinutesProps) {
           minutes,
           decisions,
           actions,
-          ...(plan ? { planUuid: plan } : {}),
+          ...(plan ? { planUuid: plan, sharedSummary } : {}),
           ...(selected && plan !== saved?.planUuid ? { planLinkToken: selected.token } : {}),
         });
       }}>
@@ -63,6 +65,11 @@ export function MeetingMinutes({ saved, revision, save }: MinutesProps) {
             </select>
           )}
         </Field>
+        {plan ? (
+          <Field label="Summary for plan viewers" hint="Leave blank to keep the meeting record private.">
+            {(control) => <textarea {...control} maxLength={2000} value={sharedSummary} onChange={(event) => { setSharedSummary(event.target.value); }} />}
+          </Field>
+        ) : null}
         {actions.map((action, index) => (
           <fieldset key={index}>
             <legend>Action {index + 1}</legend>

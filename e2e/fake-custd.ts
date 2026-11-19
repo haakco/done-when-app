@@ -389,8 +389,8 @@ export class FakeCustd {
         }
       }
     }
-    const { minutes, decisions, actions, planUuid } = request;
-    item.meetingMinutes = { minutes, decisions, actions, ...(planUuid ? { planUuid } : {}) };
+    const { minutes, decisions, actions, planUuid, sharedSummary } = request;
+    item.meetingMinutes = { minutes, decisions, actions, ...(planUuid ? { planUuid } : {}), ...(sharedSummary ? { sharedSummary } : {}) };
   }
 
   private updatePlan(item: Stored, request: AppPlanUpdate): void {
@@ -432,7 +432,14 @@ export class FakeCustd {
       read.estimates = this.estimateList(item);
     }
     if (item.kind === "link_collection") read.linkCollection = { entries: item.entries };
-    if (item.plan) read.plan = structuredClone(item.plan);
+    if (item.plan) {
+      read.plan = structuredClone(item.plan);
+      read.planMeetingSummaries = [...this.items.values()].flatMap((meeting) => {
+        const notes = meeting.meetingMinutes;
+        return notes?.planUuid === item.uuid && notes.sharedSummary && meeting.meeting
+          ? [{ meetingUuid: meeting.uuid, name: meeting.meeting.name, summary: notes.sharedSummary }] : [];
+      });
+    }
     if (item.model) read.uncertaintyModel = structuredClone(item.model);
     if (item.meeting) read.meeting = meetingRead(item.meeting);
     return read;
