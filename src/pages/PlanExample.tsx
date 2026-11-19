@@ -90,13 +90,15 @@ export default function PlanExample() {
         {meetingStage === "ready" ? <button type="button" className="button" onClick={() => { setMeetingStage("review"); }}>Start sample meeting</button> : null}
         {meetingStage === "review" ? (
           <>
+            <p role="timer" aria-label="Sample meeting elapsed">0:00 elapsed</p>
             <p role="status">Review progress · 5 min left. Up next: Decide next steps. Projected finish: 10 min after start.</p>
             <button type="button" className="button" onClick={() => { setMeetingStage("decide"); }}>Finish review after 3 min</button>
           </>
         ) : null}
         {meetingStage === "decide" ? (
           <>
-            <p role="status">Decide next steps · 5 min left. Review finished 2 min early. Projected finish: 8 min after start, 2 min ahead of the original plan.</p>
+            <p role="timer" aria-label="Sample meeting elapsed">3:00 elapsed</p>
+            <p role="status">Decide next steps · 7 min left (originally 5). Review finished 2 min early. Projected finish: 10 min after start.</p>
             <button type="button" className="button" onClick={() => { setMeetingStage("ended"); }}>Finish decisions after 8 min</button>
           </>
         ) : null}
@@ -104,7 +106,7 @@ export default function PlanExample() {
           <div role="status">
             <p>Planned 10 min. Took 11 min. Finished 1 min late.</p>
             <p>Review progress · 5 min planned · 3 min actual</p>
-            <p>Decide next steps · 5 min planned · 8 min actual</p>
+            <p>Decide next steps · 5 min planned · 7 min allocated · 8 min actual</p>
             <p>Decision · Keep the launch date.</p>
             <p>Action · <a href="#example-part-pages" onClick={() => { inspect("pages"); }}>Finish editing the remaining pages</a>.</p>
           </div>

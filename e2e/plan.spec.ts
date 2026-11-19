@@ -52,6 +52,8 @@ test("the launch example previews a forecast and runs a meeting without writes",
   await expect(page.getByRole("region", { name: "Dependency canvas" }).locator(".react-flow__edge")).toHaveCount(2);
   await page.getByRole("button", { name: "Start sample meeting" }).click();
   await page.getByRole("button", { name: "Finish review after 3 min" }).click();
+  await expect(page.getByRole("timer", { name: "Sample meeting elapsed" })).toHaveText("3:00 elapsed");
+  await expect(page.getByText(/7 min left \(originally 5\)/)).toBeVisible();
   await page.getByRole("button", { name: "Finish decisions after 8 min" }).click();
   await expect(page.getByText("Planned 10 min. Took 11 min. Finished 1 min late.")).toBeVisible();
   expect(fake.requests.filter((request) => request.method !== "GET")).toHaveLength(0);
