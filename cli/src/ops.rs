@@ -4,10 +4,11 @@
 
 use custd_sdk::{
     APP_ITEM_KIND_LINK_COLLECTION, APP_ITEM_KIND_MEASUREMENT_PROJECT, APP_ITEM_KIND_MEETING,
-    ApiError, AppClient, AppItemCreate, AppItemRead, AppLink, AppMeasurementProjectCreate,
-    AppMeeting, AppReadOptions, Conditional, DeviceLogin, Error, MeasurementForecastRun,
-    MeasurementForecastRunRequest, MeasurementObservation, MeasurementObservationBulk,
-    MeasurementSeriesCreate, MeasurementTargetCreate, ProjectComplete, ProjectEstimateCreate,
+    ApiError, AppClient, AppForecastStory, AppItemCreate, AppItemRead, AppLink,
+    AppMeasurementProjectCreate, AppMeeting, AppReadOptions, Conditional, DeviceLogin, Error,
+    MeasurementForecastRun, MeasurementForecastRunRequest, MeasurementObservation,
+    MeasurementObservationBulk, MeasurementSeriesCreate, MeasurementTargetCreate, ProjectComplete,
+    ProjectEstimateCreate,
 };
 use serde::Serialize;
 
@@ -17,6 +18,7 @@ use crate::links::{Access, ItemKind, card_url, item_url, parse_link};
 use crate::store::{StoredItem, StoredSession};
 use crate::time::{now_rfc3339, now_seconds, parse_rfc3339};
 
+const FORECAST_MIN_MEASUREMENTS: i64 = 3;
 const COUNTER_PROJECT_KIND: &str = "deadline_forecast";
 /// The first series' code tells the item kinds apart, as in the web app's `itemKindOf`.
 pub const COUNTER_SERIES_CODE: &str = "value";
@@ -175,6 +177,7 @@ pub struct ForecastSummary {
     /// Chance of reaching the target by its deadline, 0 to 1.
     pub deadline_probability: Option<f64>,
     pub completion_confidence: Option<f64>,
+    pub completion_median: Option<String>,
     pub completion_lower: Option<String>,
     pub completion_upper: Option<String>,
     pub rate_per_day: Option<f64>,
@@ -192,6 +195,7 @@ impl ForecastSummary {
             input_count: run.input_count,
             deadline_probability: counter.and_then(|c| c.deadline_probability),
             completion_confidence: interval.map(|i| i.confidence),
+            completion_median: run.percentiles.get("p50").cloned(),
             completion_lower: interval.map(|i| i.lower.clone()),
             completion_upper: interval.map(|i| i.upper.clone()),
             rate_per_day: counter.and_then(|c| c.rate.as_ref()).map(|r| r.per_day),
@@ -212,6 +216,9 @@ impl ForecastSummary {
                 self.input_count
             ),
         };
+        if let Some(median) = &self.completion_median {
+            text.push_str(&format!("; median {}", short_date(median)));
+        }
         if let Some(chance) = self.deadline_probability {
             text.push_str(&format!("; {:.0}% chance by the deadline", chance * 100.0));
         }
@@ -245,7 +252,37 @@ pub struct AddReport {
     pub accepted: i64,
     pub rejected: i64,
     pub target_reached: bool,
-    pub forecast: ForecastSummary,
+    pub forecast: Option<ForecastSummary>,
+    pub forecast_error: Option<String>,
+    pub rows: Vec<AddRow>,
+}
+
+impl AddReport {
+    pub fn check_outcome(&self) -> CliResult<()> {
+        if let Some(error) = &self.forecast_error {
+            return Err(CliError::Usage(format!(
+                "{} measurement(s) were stored; {} rejected. Forecast refresh failed ({error}); do not add accepted measurements again",
+                self.accepted, self.rejected
+            )));
+        }
+        if self.rejected > 0 {
+            return Err(CliError::Usage(format!(
+                "{} measurement(s) accepted; {} rejected",
+                self.accepted, self.rejected
+            )));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddRow {
+    pub row_index: i64,
+    pub success: bool,
+    pub status: Option<i64>,
+    pub observation_uuid: Option<String>,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -434,7 +471,7 @@ pub fn create_counter(ctx: &Context, draft: &CounterDraft) -> CliResult<CreatedR
             reach: Reach::Link(created.owner_token.clone()),
             stored: None,
         };
-        add_rows(ctx, &owner, &created.item, &[(at, start)])?;
+        add_rows(ctx, &owner, &created.item, &[(at, start)], None)?.check_outcome()?;
         report.start_measurement_added = true;
     }
     Ok(report)
@@ -488,9 +525,15 @@ pub fn add_measurements(
     ctx: &Context,
     reference: &str,
     rows: &[(String, f64)],
+    key: Option<&str>,
 ) -> CliResult<AddReport> {
     if rows.is_empty() {
         return Err(CliError::Usage("no measurements to add".to_owned()));
+    }
+    if key.is_some() && rows.len() != 1 {
+        return Err(CliError::Usage(
+            "one idempotency key identifies one measurement".to_owned(),
+        ));
     }
     let (resolved, read) = read_owned(ctx, reference)?;
     if item_kind(&read) != ItemKind::Counter {
@@ -498,7 +541,7 @@ pub fn add_measurements(
             "measurements go on a counter; a project takes estimates".to_owned(),
         ));
     }
-    add_rows(ctx, &resolved, &read, rows)
+    add_rows(ctx, &resolved, &read, rows, key)
 }
 
 fn add_rows(
@@ -506,6 +549,7 @@ fn add_rows(
     owner: &Resolved,
     read: &AppItemRead,
     rows: &[(String, f64)],
+    key: Option<&str>,
 ) -> CliResult<AddReport> {
     let series_uuid = read
         .measurement_project
@@ -520,26 +564,63 @@ fn add_rows(
                 series_uuid: series_uuid.clone(),
                 observed_at: at.clone(),
                 value: *value,
-                idempotency_key: None,
+                idempotency_key: key.map(str::to_owned),
             })
             .collect(),
     };
     let app = ctx.app()?;
     let link = owner.link(&app);
     let import = link.add_measurements(&request)?;
-    let run = link
-        .run_forecast(&MeasurementForecastRunRequest::default())
-        .map_err(|error| CliError::ForecastAfterWrite {
-            accepted: import.accepted,
-            error,
-        })?;
+    let (forecast, forecast_error) = if import.accepted > 0 {
+        match refresh_forecast(ctx, owner, read, &link, import.accepted) {
+            Ok(forecast) => (forecast.as_ref().map(ForecastSummary::from_run), None),
+            Err(error) => (None, Some(error.to_string())),
+        }
+    } else {
+        (None, None)
+    };
     Ok(AddReport {
         item_uuid: read.item.item_uuid.clone(),
         accepted: import.accepted,
         rejected: import.rejected,
         target_reached: import.completed_target_uuid.is_some(),
-        forecast: ForecastSummary::from_run(&run),
+        forecast,
+        forecast_error,
+        rows: import
+            .results
+            .into_iter()
+            .map(|row| AddRow {
+                row_index: row.row_index,
+                success: row.success,
+                status: row.status,
+                observation_uuid: row.observation_uuid,
+                title: row.title,
+            })
+            .collect(),
     })
+}
+
+fn refresh_forecast(
+    ctx: &Context,
+    owner: &Resolved,
+    item: &AppItemRead,
+    link: &AppLink,
+    accepted: i64,
+) -> CliResult<Option<MeasurementForecastRun>> {
+    let count = read_forecast_story(link)?.map_or(accepted, |story| story.trust.observation_count);
+    if count < FORECAST_MIN_MEASUREMENTS {
+        return Ok(None);
+    }
+    let previous = latest_forecast(ctx, owner)?;
+    let method = item
+        .measurement_project
+        .as_ref()
+        .and_then(|project| project.run.forecast_method.clone());
+    Ok(Some(link.run_forecast(&MeasurementForecastRunRequest {
+        method: method.or_else(|| previous.as_ref().map(|run| run.method.clone())),
+        forecast_from: previous.and_then(|run| run.forecast_from),
+        ..Default::default()
+    })?))
 }
 
 /// Parses a two-column CSV of ISO timestamp and value; a header row is allowed first.
@@ -561,7 +642,9 @@ pub fn parse_csv(text: &str) -> CliResult<Vec<(String, f64)>> {
         };
         match parsed {
             Some((at, value)) => rows.push((crate::time::format_rfc3339(at), value)),
-            None if rows.is_empty() && index == first_line(text) => continue,
+            None if index == first_line(text) && cells.as_slice() == ["timestamp", "value"] => {
+                continue;
+            }
             None => {
                 return Err(CliError::Usage(format!(
                     "CSV line {}: expected an ISO timestamp and a number",
@@ -591,6 +674,17 @@ pub fn timestamp(text: &str) -> CliResult<String> {
 }
 
 // ---- Reads ----
+
+pub fn read_forecast_story(link: &AppLink) -> CliResult<Option<AppForecastStory>> {
+    match link.forecast_story(&AppReadOptions::default()) {
+        Ok(Conditional::Modified { value, .. }) => Ok(Some(value)),
+        Ok(Conditional::NotModified) => Err(CliError::Fetch(
+            "forecast story was not returned".to_owned(),
+        )),
+        Err(Error::Api(ApiError { status: 404, .. })) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
 
 pub fn show(ctx: &Context, reference: &str) -> CliResult<ItemReport> {
     let resolved = resolve(ctx, reference)?;
@@ -807,10 +901,11 @@ pub fn estimate(
     low: &str,
     high: &str,
     note: Option<String>,
+    at: Option<&str>,
 ) -> CliResult<EstimateReport> {
     let (resolved, _) = read_owned(ctx, reference)?;
     let request = ProjectEstimateCreate {
-        estimated_at: None,
+        estimated_at: at.map(timestamp).transpose()?,
         low_date: timestamp(low)?,
         high_date: timestamp(high)?,
         note,

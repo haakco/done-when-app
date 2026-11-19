@@ -11,4 +11,5 @@ pub mod ops;
 pub mod report;
 pub mod store;
 pub mod time;
+pub mod tui;
 pub mod watch;

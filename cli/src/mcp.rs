@@ -206,7 +206,12 @@ fn call_tool(ctx: &Context, params: &Value) -> Result<Value, String> {
                 Some(at) => ops::timestamp(at).map_err(|e| e.to_string())?,
                 None => crate::time::now_rfc3339(),
             };
-            as_json(ops::add_measurements(ctx, &item, &[(at, value)]))
+            as_json(
+                ops::add_measurements(ctx, &item, &[(at, value)], None).and_then(|report| {
+                    report.check_outcome()?;
+                    Ok(report)
+                }),
+            )
         }
         "read_forecast" => as_json(ops::show(ctx, &text_arg(&args, "item")?)),
         "list_items" => as_json(ops::list(ctx)),

@@ -54,6 +54,8 @@ pub enum Command {
     Dashboard(DashboardCommand),
     /// Open a live view of a counter's forecast.
     Watch(WatchArgs),
+    /// Browse and update counters and projects in the terminal.
+    Tui,
     /// Run a stdio MCP server for AI agents.
     Mcp,
 }
@@ -100,6 +102,9 @@ pub struct AddArgs {
     pub at: Option<String>,
     #[arg(long)]
     pub csv: Option<PathBuf>,
+    /// Stable key for retrying one measurement; use the same key, timestamp and value.
+    #[arg(long, requires = "at", conflicts_with = "csv", value_parser = nonempty_key)]
+    pub idempotency_key: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -109,6 +114,9 @@ pub struct EstimateArgs {
     pub low: String,
     #[arg(long)]
     pub high: String,
+    /// When the estimate was made (default now). Estimates cannot be retried automatically.
+    #[arg(long)]
+    pub at: Option<String>,
     #[arg(long)]
     pub note: Option<String>,
 }
@@ -183,14 +191,25 @@ pub fn dispatch(
         Command::New(NewCommand::Counter(args)) => {
             print(out, json, &ops::create_counter(ctx, &args.into())?)
         }
-        Command::Add(args) => print(out, json, &add(ctx, &args)?),
+        Command::Add(args) => {
+            let report = add(ctx, &args)?;
+            print(out, json, &report)?;
+            report.check_outcome()
+        }
         Command::Show(args) => print(out, json, &ops::show(ctx, &args.item)?),
         Command::List => print(out, json, &ops::list(ctx)?),
         Command::Claim(args) => print(out, json, &ops::claim(ctx, &args.item)?),
         Command::Estimate(args) => print(
             out,
             json,
-            &ops::estimate(ctx, &args.item, &args.low, &args.high, args.note)?,
+            &ops::estimate(
+                ctx,
+                &args.item,
+                &args.low,
+                &args.high,
+                args.note,
+                args.at.as_deref(),
+            )?,
         ),
         Command::Complete(args) => print(
             out,
@@ -213,6 +232,7 @@ pub fn dispatch(
             Duration::from_secs(args.interval.max(1)),
             !args.no_image,
         ),
+        Command::Tui => crate::tui::run(ctx),
         Command::Mcp => crate::mcp::serve(ctx, input, out),
     }
 }
@@ -230,7 +250,14 @@ fn add(ctx: &Context, args: &AddArgs) -> CliResult<ops::AddReport> {
         }
         (None, None) => return Err(CliError::Usage("give a value or --csv".to_owned())),
     };
-    ops::add_measurements(ctx, &args.item, &rows)
+    ops::add_measurements(ctx, &args.item, &rows, args.idempotency_key.as_deref())
+}
+
+fn nonempty_key(text: &str) -> Result<String, String> {
+    if text.trim().is_empty() {
+        return Err("idempotency key cannot be blank".to_owned());
+    }
+    Ok(text.to_owned())
 }
 
 fn print(out: &mut dyn Write, json: bool, report: &impl Report) -> CliResult<()> {

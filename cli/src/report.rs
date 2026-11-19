@@ -38,7 +38,17 @@ impl Report for AddReport {
         if self.target_reached {
             text.push_str(". Target reached!");
         }
-        format!("{text}\n{}", self.forecast.sentence())
+        for row in self.rows.iter().filter(|row| !row.success) {
+            text.push_str(&format!(
+                "\nRow {}: {}",
+                row.row_index + 1,
+                row.title.as_deref().unwrap_or("rejected"),
+            ));
+        }
+        if let Some(forecast) = &self.forecast {
+            text.push_str(&format!("\n{}", forecast.sentence()));
+        }
+        text
     }
 }
 

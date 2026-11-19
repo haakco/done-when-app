@@ -35,10 +35,23 @@ fn counter_journey_keeps_the_owner_link_private() {
         assert_eq!(mode & 0o777, 0o600);
     }
 
+    let (_, sparse, _) = run(base, &dir, &["add", "Pages", "20"], "");
+    assert!(!sparse.contains("chance by the deadline"), "{sparse}");
     let (code, out, err) = run(base, &dir, &["add", "Pages", "40"], "");
     assert_eq!(code, 0, "{err}");
     assert!(out.contains("Added 1 measurement"), "{out}");
-    assert!(out.contains("50% chance by the deadline"), "{out}");
+    assert!(out.contains("75% chance by the deadline"), "{out}");
+    assert!(out.contains("median 2026-12-02"), "{out}");
+    let (code, _, err) = run(base, &dir, &["add", "Pages", "55"], "");
+    assert_eq!(code, 0, "{err}");
+    let request = api
+        .requests()
+        .into_iter()
+        .rfind(|request| request.method == "POST" && request.target == "/api/v1/app/forecast/runs")
+        .unwrap();
+    let settings: Value = serde_json::from_str(&request.body).unwrap();
+    assert_eq!(settings["method"], "bayesian_linear_regression");
+    assert_eq!(settings["forecastFrom"], "2026-11-15T00:00:00Z");
     let (_, out, _) = run(base, &dir, &["show", "Pages"], "");
     assert!(out.contains("Target: 100 pages"), "{out}");
 
@@ -51,7 +64,7 @@ fn counter_journey_keeps_the_owner_link_private() {
     assert_eq!(code, 0);
     let shown: Value = serde_json::from_str(&out).unwrap();
     assert_eq!(shown["access"], "share");
-    assert_eq!(shown["forecast"]["deadlineProbability"], 0.5);
+    assert_eq!(shown["forecast"]["deadlineProbability"], 0.95);
 
     let (_, out, _) = run(base, &dir, &["list", "--json"], "");
     let listed: Value = serde_json::from_str(&out).unwrap();
@@ -138,11 +151,16 @@ fn csv_import_estimate_and_dashboard() {
             "2026-12-01",
             "--high",
             "2026-12-20",
+            "--at",
+            "2026-11-01",
+            "--json",
         ],
         "",
     );
     assert_eq!(code, 0, "{err}");
-    assert!(out.contains("2026-12-01T00:00:00Z"), "{out}");
+    let estimate: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(estimate["lowDate"], "2026-12-01T00:00:00Z");
+    assert_eq!(estimate["estimatedAt"], "2026-11-01T00:00:00Z");
 
     let (code, _, err) = run(base, &dir, &["dashboard", "create", "--name", "Board"], "");
     assert_eq!(code, 0, "{err}");
@@ -230,10 +248,16 @@ fn a_failed_forecast_says_the_measurement_was_stored() {
         &["new", "counter", "--name", "Flaky", "--target", "10"],
         "",
     );
-    let (code, _, err) = run(&api.base_url, &dir, &["add", "Flaky", "2"], "");
+    run(&api.base_url, &dir, &["add", "Flaky", "1"], "");
+    run(&api.base_url, &dir, &["add", "Flaky", "2"], "");
+    let (code, out, err) = run(&api.base_url, &dir, &["add", "Flaky", "3", "--json"], "");
+    let report: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(report["accepted"], 1);
+    assert!(report["forecastError"].is_string());
     assert_eq!(code, 1);
     assert!(
-        err.contains("1 measurement(s) were stored") && err.contains("do not add them again"),
+        err.contains("1 measurement(s) were stored")
+            && err.contains("do not add accepted measurements again"),
         "{err}"
     );
 }
@@ -343,4 +367,72 @@ fn an_expired_session_is_not_sent() {
         serde_json::from_str::<Value>(&out).unwrap()["signedIn"],
         false
     );
+}
+
+#[test]
+fn a_keyed_measurement_replays_and_a_partial_import_reports_rejected_rows() {
+    let api = FakeApi::start();
+    let dir = temp_config_dir();
+    let base = &api.base_url;
+    assert_eq!(
+        run(
+            base,
+            &dir,
+            &["new", "counter", "--name", "Partial", "--target", "10"],
+            ""
+        )
+        .0,
+        0
+    );
+    let fixed = [
+        "add",
+        "Partial",
+        "2",
+        "--at",
+        "2026-11-01",
+        "--idempotency-key",
+        "batch-1",
+        "--json",
+    ];
+    let (first_code, first, _) = run(base, &dir, &fixed, "");
+    let (second_code, second, _) = run(base, &dir, &fixed, "");
+    assert_eq!((first_code, second_code), (0, 0));
+    let first: Value = serde_json::from_str(&first).unwrap();
+    let second: Value = serde_json::from_str(&second).unwrap();
+    assert_eq!(
+        first["rows"][0]["observationUuid"],
+        second["rows"][0]["observationUuid"]
+    );
+    assert_eq!(api.count("POST", "/api/v1/app/forecast/runs"), 0);
+    let requests = api.requests();
+    let sent: Value = serde_json::from_str(
+        &requests
+            .iter()
+            .rev()
+            .find(|r| r.method == "POST")
+            .unwrap()
+            .body,
+    )
+    .unwrap();
+    assert_eq!(sent["rows"][0]["idempotencyKey"], "batch-1");
+
+    let csv = dir.join("partial.csv");
+    std::fs::write(&csv, "timestamp,value\n2026-11-02,1\n2026-11-03,-1\n").unwrap();
+    let (code, out, err) = run(
+        base,
+        &dir,
+        &["add", "Partial", "--csv", csv.to_str().unwrap(), "--json"],
+        "",
+    );
+    assert_eq!(code, 1, "{err}");
+    let result: Value = serde_json::from_str(&out).unwrap();
+    assert_eq!(result["accepted"], 1);
+    assert_eq!(result["rejected"], 1);
+    assert_eq!(result["rows"][1]["success"], false);
+    assert_eq!(
+        api.count("POST", "/api/v1/app/forecast/runs"),
+        0,
+        "the replay does not add to the measurement count"
+    );
+    assert!(done_when::ops::parse_csv("bad date,1\n2026-11-01,1").is_err());
 }

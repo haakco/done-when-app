@@ -44,6 +44,7 @@ fn watch_polls_conditionally_and_renders_with_and_without_an_image() {
         ],
         "",
     );
+    run(&api.base_url, &dir, &["add", "Pages", "20"], "");
     run(&api.base_url, &dir, &["add", "Pages", "40"], "");
 
     let ctx = Context::new(&api.base_url, dir.to_path_buf());
@@ -70,7 +71,7 @@ fn watch_polls_conditionally_and_renders_with_and_without_an_image() {
             "second poll of {path} is conditional"
         );
     }
-    assert_eq!(model.measurements.len(), 2, "history comes from the story");
+    assert_eq!(model.measurements.len(), 3, "history comes from the story");
 
     let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
     terminal.draw(|frame| render(frame, &model, None)).unwrap();
@@ -78,7 +79,7 @@ fn watch_polls_conditionally_and_renders_with_and_without_an_image() {
     for want in [
         "Pages",
         "Forecast",
-        "50% by 2026-12-01",
+        "75% by 2026-12-01",
         "cannot show images",
         "Measurements",
         "40",

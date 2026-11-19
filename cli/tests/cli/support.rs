@@ -38,6 +38,7 @@ struct Item {
     owner_user: Option<String>,
     version: i64,
     measurements: Vec<(String, f64)>,
+    measurement_keys: std::collections::HashMap<String, String>,
     forecast_version: Option<i64>,
     entries: Vec<(String, String)>,
     status: String,
@@ -261,24 +262,32 @@ fn route(
                 ok(item_read(item, true, Some(user)))
             }
         },
-        ("GET", "/api/v1/app/forecast/story") => match item.forecast_version {
-            Some(version) => conditional(request, version, story(item)),
-            None => problem(404, "app_forecast_not_found"),
-        },
+        ("GET", "/api/v1/app/forecast/story") => conditional(request, item.version, story(item)),
         ("POST", "/api/v1/app/item/measurements") => {
             let rows = body["rows"].as_array().unwrap();
-            let results: Vec<Value> = (0..rows.len())
-                .map(|i| json!({ "rowIndex": i, "success": true, "status": 201, "observationUuid": format!("o-{i}") }))
-                .collect();
-            item.measurements.extend(rows.iter().map(|r| {
-                (
-                    r["observedAt"].as_str().unwrap().to_owned(),
-                    r["value"].as_f64().unwrap(),
-                )
-            }));
+            let mut accepted = 0;
+            let mut rejected = 0;
+            let results: Vec<Value> = rows.iter().enumerate().map(|(index, row)| {
+                let value = row["value"].as_f64().unwrap();
+                if item.name == "Partial" && value < 0.0 {
+                    rejected += 1;
+                    return json!({"rowIndex":index,"success":false,"status":422,"title":"Row rejected"});
+                }
+                accepted += 1;
+                let key = row["idempotencyKey"].as_str();
+                let uuid = key.and_then(|key| item.measurement_keys.get(key)).cloned().unwrap_or_else(|| {
+                    let uuid = format!("o-{}", item.measurements.len());
+                    item.measurements.push((row["observedAt"].as_str().unwrap().to_owned(), value));
+                    if let Some(key) = key {
+                        item.measurement_keys.insert(key.to_owned(), uuid.clone());
+                    }
+                    uuid
+                });
+                json!({"rowIndex":index,"success":true,"status":201,"observationUuid":uuid})
+            }).collect();
             item.version += 1;
             ok(
-                json!({ "importId": "imp-1", "accepted": rows.len(), "rejected": 0, "results": results }),
+                json!({"importId":"imp-1","accepted":accepted,"rejected":rejected,"results":results}),
             )
         }
         ("POST", "/api/v1/app/forecast/runs") if item.name == "Flaky" => problem(500, "internal"),
@@ -292,7 +301,7 @@ fn route(
             None => problem(404, "app_forecast_not_found"),
         },
         ("POST", "/api/v1/app/item/estimates") => ok(json!({
-            "estimateUuid": "e-1", "estimatedAt": "2026-11-18T00:00:00Z",
+            "estimateUuid": "e-1", "estimatedAt": body["estimatedAt"].as_str().unwrap_or("2026-11-18T00:00:00Z"),
             "lowDate": body["lowDate"], "highDate": body["highDate"], "note": body["note"].as_str().unwrap_or("")
         })),
         ("POST", "/api/v1/app/item/complete") => {
@@ -403,8 +412,8 @@ fn forecast(item: &Item) -> Value {
     };
     json!({
         "forecastRunUuid": "run-1", "projectUuid": "p-1", "status": "completed",
-        "method": "bayesian_linear_regression", "generatedAt": "2026-11-18T00:00:00Z", "forecastFrom": null,
-        "inputCount": item.measurements.len(), "sampleCount": 3, "seed": 1, "percentiles": null,
+        "method": "bayesian_linear_regression", "generatedAt": "2026-11-18T00:00:00Z", "forecastFrom": "2026-11-15T00:00:00Z",
+        "inputCount": item.measurements.len(), "sampleCount": 3, "seed": 1, "percentiles": {"p50": "2026-12-02T00:00:00Z"},
         "provenance": null, "warnings": null,
         "counter": { "pooledRunCount": 1, "deadlineProbability": chance,
             "completionInterval": { "confidence": 0.9, "lower": "2026-11-28T00:00:00Z", "upper": "2026-12-05T00:00:00Z" },

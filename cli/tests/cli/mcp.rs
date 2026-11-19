@@ -32,18 +32,19 @@ fn an_agent_adds_a_measurement_and_reads_the_new_forecast() {
         json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }).to_string(),
         json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }).to_string(),
         call(3, "create_counter", json!({ "name": "Tasks", "target": 100, "start": 1, "deadline": "2026-12-01" })),
+        call(8, "add_measurement", json!({ "item": "item-0", "value": 15 })),
         call(4, "add_measurement", json!({ "item": "item-0", "value": 30 })),
         call(5, "read_forecast", json!({ "item": "Tasks" })),
         call(6, "add_measurement", json!({ "item": format!("{}/c/shr-0", api.base_url), "value": 31 })),
         call(7, "list_items", json!({})),
     ];
     let replies = serve(&api, &dir, &lines);
-    assert_eq!(replies.len(), 7, "a notification gets no reply");
+    assert_eq!(replies.len(), 8, "a notification gets no reply");
     assert_eq!(
-        replies[6]["result"]["structuredContent"]["items"][0]["kind"],
+        replies[7]["result"]["structuredContent"]["items"][0]["kind"],
         "counter"
     );
-    assert_eq!(replies[4]["result"]["structuredContent"]["kind"], "counter");
+    assert_eq!(replies[5]["result"]["structuredContent"]["kind"], "counter");
     assert_eq!(replies[0]["result"]["protocolVersion"], "2025-06-18");
 
     let tools = replies[1]["result"]["tools"].as_array().unwrap();
@@ -62,14 +63,14 @@ fn an_agent_adds_a_measurement_and_reads_the_new_forecast() {
         "owner token never leaves the machine"
     );
     assert_eq!(
-        replies[3]["result"]["structuredContent"]["forecast"]["deadlineProbability"],
-        0.5
+        replies[4]["result"]["structuredContent"]["forecast"]["deadlineProbability"],
+        0.75
     );
-    let forecast = &replies[4]["result"]["structuredContent"]["forecast"];
-    assert_eq!(forecast["deadlineProbability"], 0.5);
-    assert_eq!(forecast["inputCount"], 2);
+    let forecast = &replies[5]["result"]["structuredContent"]["forecast"];
+    assert_eq!(forecast["deadlineProbability"], 0.75);
+    assert_eq!(forecast["inputCount"], 3);
 
-    let refused = &replies[5]["result"];
+    let refused = &replies[6]["result"];
     assert_eq!(refused["isError"], true);
     assert!(
         refused["content"][0]["text"]
@@ -77,7 +78,7 @@ fn an_agent_adds_a_measurement_and_reads_the_new_forecast() {
             .unwrap()
             .contains("read-only")
     );
-    assert_eq!(api.count("POST", "/api/v1/app/item/measurements"), 2);
+    assert_eq!(api.count("POST", "/api/v1/app/item/measurements"), 3);
 }
 
 #[test]
