@@ -13,7 +13,7 @@ export function NewDashboardPage() {
   return (
     <>
       <h1>New dashboard</h1>
-      <p className="lede">Put several counters and projects on one screen that updates itself.</p>
+      <p className="lede">Follow counters, project forecasts, models and meetings on one shareable dashboard.</p>
       <WithData>{({ data }) => <DashboardForm data={data} />}</WithData>
     </>
   );

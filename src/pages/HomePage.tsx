@@ -11,7 +11,7 @@ export function HomePage() {
   return (
     <>
       <h1 className="hero home-hero">See when it will be done.</h1>
-      <p className="lede">Count your progress, get an honest forecast, and share one link. No account needed.</p>
+      <p className="lede">Plan projects, forecast progress and run meetings. Share the whole picture from one dashboard.</p>
       <div className="home-start">
         <section className="card card--lead" aria-labelledby="start-heading">
           <h2 id="start-heading">Start a counter</h2>
@@ -20,7 +20,7 @@ export function HomePage() {
         <ForecastExample />
       </div>
       <section className="section" aria-labelledby="other-heading">
-        <h2 id="other-heading">Other ways to plan</h2>
+        <h2 id="other-heading">Plan and manage your work</h2>
         <ul className="card-grid">
           <li className="card">
             <h3>

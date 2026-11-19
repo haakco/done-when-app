@@ -230,3 +230,63 @@ test("forecast controls keep the selected dates when a live measurement moves th
   await expect(reset).toBeDisabled();
   await expect(range).not.toHaveText(panned ?? "");
 });
+
+test("one shared workspace follows a counter, a project estimate and a meeting", async ({ page, browser, fake }) => {
+  test.slow();
+  await createCounter(page, "Launch checks", "10");
+  const counter = page.url();
+
+  await page.getByRole("link", { name: "My items", exact: true }).click();
+  const create = page.getByRole("navigation", { name: "Create workspace items" });
+  await create.getByRole("link", { name: "New project" }).click();
+  await page.getByLabel("Project name").fill("Release plan");
+  await page.getByLabel("Done when…").fill("The new version is running.");
+  await page.getByLabel("Delivery target").fill("2027-01-15");
+  await page.getByRole("button", { name: "Create project" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Release plan" })).toBeVisible();
+  await page.getByLabel("Earliest (low)").fill("2027-01-10");
+  await page.getByLabel("Latest (high)").fill("2027-01-18");
+  await page.getByRole("button", { name: "Save estimate" }).click();
+  await expect(page.getByText("Likely Jan 10, 2027 – Jan 18, 2027")).toBeVisible();
+
+  await page.getByRole("link", { name: "My items", exact: true }).click();
+  await create.getByRole("link", { name: "New meeting" }).click();
+  await page.getByLabel("Meeting name").fill("Release review");
+  await page.getByLabel("Block 1 title").fill("Review risks");
+  await page.getByLabel("Minutes").fill("10");
+  await page.getByRole("button", { name: "Create meeting" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Release review" })).toBeVisible();
+  const meeting = page.url();
+
+  await page.getByRole("link", { name: "My items", exact: true }).click();
+  await create.getByRole("link", { name: "New dashboard" }).click();
+  await page.getByRole("button", { name: "Create dashboard" }).click();
+  const picker = page.getByLabel("Choose a recent item");
+  for (const [name, kind] of [["Launch checks", "counter"], ["Release plan", "project"], ["Release review", "meeting"]] as const) {
+    await picker.selectOption({ label: `${name} (${kind})` });
+    await page.getByRole("button", { name: "Add selected item" }).click();
+    await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+  }
+
+  const url = await copyShareUrl(page);
+  const viewer = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    await routeToFake(viewer, fake);
+    const view = await viewer.newPage();
+    await view.goto(url);
+    const items = view.getByRole("list", { name: "Dashboard items" });
+    await expect(items.getByRole("heading")).toHaveText(["Launch checks", "Release plan", "Release review"]);
+    await expect(items.getByText("Likely Jan 10, 2027 – Jan 18, 2027")).toBeVisible();
+    await expect(view.getByRole("button", { name: /^(Add selected item|Remove|Start meeting)/ })).toHaveCount(0);
+
+    await page.goto(counter);
+    await page.getByLabel("New value").fill("3");
+    await page.getByRole("button", { name: "Add measurement" }).click();
+    await expect(items.getByRole("progressbar", { name: "Launch checks progress" })).toHaveAttribute("aria-valuetext", /3 of 10/);
+    await page.goto(meeting);
+    await page.getByRole("button", { name: "Start meeting" }).click();
+    await expect(items.getByText("Review risks", { exact: false })).toBeVisible();
+  } finally {
+    await viewer.close();
+  }
+});

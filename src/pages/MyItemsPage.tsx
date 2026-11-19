@@ -13,6 +13,12 @@ export function MyItemsPage() {
   return (
     <>
       <h1>My items</h1>
+      <nav className="button-row" aria-label="Create workspace items">
+        <Link className="button" to="/new/counter">New counter</Link>
+        <Link className="button" to="/new/project">New project</Link>
+        <Link className="button" to="/new/meeting">New meeting</Link>
+        <Link className="button" to="/new/dashboard">New dashboard</Link>
+      </nav>
       <WithData>{({ data }) => <MyItems data={data} />}</WithData>
     </>
   );

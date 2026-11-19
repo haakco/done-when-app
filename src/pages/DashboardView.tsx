@@ -17,6 +17,8 @@ import { MeetingStatus } from "./MeetingView";
 import { modelOutputs } from "./ModelView";
 import { dashboardWorkbook } from "../lib/exports";
 import { counterSummary, modelHeadline, projectSummary } from "../lib/forecast-text";
+import { recentItems, savedShareToken } from "../lib/device";
+import { tokenFromPaste } from "../lib/links";
 import { meetingLine } from "../lib/meeting";
 import { useNow } from "../lib/use-now";
 import type { ItemViewProps } from "./view-props";
@@ -42,7 +44,7 @@ export function DashboardView({ data, access, read, live, showOwnerTools, ownerR
       </ItemHeader>
       {count === 0 ? (
         <p className="notice">
-          Nothing here yet.{showOwnerTools ? " Paste a counter or project link below to add it." : ""}
+          Nothing here yet.{showOwnerTools ? " Add a counter, project, model or meeting below." : ""}
         </p>
       ) : null}
       <ul className="card-grid dashboard-grid" aria-label="Dashboard items">
@@ -59,7 +61,7 @@ export function DashboardView({ data, access, read, live, showOwnerTools, ownerR
           <span className="muted">for an office TV: large type, updates by itself, no buttons.</span>
         </p>
       ) : null}
-      {showOwnerTools ? <AddEntryForm data={data} access={access} /> : null}
+      {showOwnerTools ? <AddEntryForm data={data} access={access} entries={dashboard.entries} /> : null}
       {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
       {showOwnerTools ? (
         <details className="more section">
@@ -159,12 +161,38 @@ function MeetingEntry({ read }: { read: AppItemRead }) {
   );
 }
 
-function AddEntryForm({ data, access }: { data: DoneWhenData; access: ItemAccess }) {
+function AddEntryForm({ data, access, entries }: { data: DoneWhenData; access: ItemAccess; entries: DashboardEntry[] }) {
+  const [selected, setSelected] = useState("");
+  const included = new Set(entries.map((entry) => entry.itemUuid));
+  const choices = recentItems().flatMap((item) => {
+    if (item.kind === "dashboard" || included.has(item.itemUuid)) return [];
+    const token = savedShareToken(item.itemUuid) ?? (item.role === "share" ? tokenFromPaste(item.path) : null);
+    return token ? [{ item, token }] : [];
+  });
+  const choice = choices.find(({ item }) => item.itemUuid === selected);
   const [pasted, setPasted] = useState("");
   const add = useMutation({ mutationFn: (value: string) => data.addDashboardEntry(access, value) });
   return (
     <section className="section card" aria-labelledby="add-entry-heading">
       <h2 id="add-entry-heading">Add a counter, project, model or meeting</h2>
+      {choices.length > 0 ? (
+        <form className="form" onSubmit={(event) => {
+          event.preventDefault();
+          if (choice) add.mutate(choice.token, { onSuccess: () => { setSelected(""); } });
+        }}>
+          <Field label="Choose a recent item">
+            {(control) => (
+              <select {...control} required value={choice ? selected : ""} onChange={(event) => { setSelected(event.target.value); }}>
+                <option value="">Choose an item</option>
+                {choices.map(({ item }) => <option key={item.itemUuid} value={item.itemUuid}>{item.name} ({item.kind})</option>)}
+              </select>
+            )}
+          </Field>
+          <div className="button-row">
+            <button type="submit" className="button button--primary" disabled={!choice || add.isPending}>Add selected item</button>
+          </div>
+        </form>
+      ) : null}
       <form
         className="form"
         onSubmit={(event) => {

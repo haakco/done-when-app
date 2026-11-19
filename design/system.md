@@ -23,8 +23,8 @@ It should feel personal and a little playful, never like an operations console.
   link) and the Download menu, then a one-time "Save your owner link" notice for the owner, then one summary card:
   the answer as a headline ("Likely done Nov 19"), one detail line, progress and pace. Then the
   owner's one common write (add a measurement or an estimate), then the chart and the live line.
-- Item kinds: counter, project, model and dashboard share this page shape, the home page's
-  "Or" cards, "My items", "Recent on this device" and dashboard tiles.
+- Item kinds: counter, project, model, meeting and dashboard share this page shape, the home page's
+  "Or" cards, "My items", "Recent on this device" and dashboard tiles. My items starts new workspace items. Dashboard owners can pick recent items with a share link and publish one read-only view of the group.
 - Everything else sits behind `.more` disclosures (`<details>`): forecast detail, several
   measurements, forecast settings, runs, alerts, links and expiry. Share and owner pages read
   the same from the top.
