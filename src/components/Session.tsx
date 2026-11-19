@@ -1,5 +1,5 @@
 import type { BrowserSignIn, SignInState } from "@haakco/custd-sdk";
-import { SIGN_IN_STATUSES } from "@haakco/custd-sdk";
+import { SIGN_IN_ERROR_CODES, SIGN_IN_STATUSES } from "@haakco/custd-sdk";
 import { useCallback, useSyncExternalStore } from "react";
 import { useDoneWhen } from "../data";
 
@@ -8,7 +8,7 @@ export type SessionView = {
   available: boolean;
   signedIn: boolean;
   pending: boolean;
-  failed: boolean;
+  failure: string | null;
   signIn: (returnTo?: string) => void;
   signOut: () => void;
 };
@@ -18,6 +18,19 @@ const noSubscribe = () => () => {};
 
 function here(): string {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function failureMessage(state: SignInState): string | null {
+  if (state.status !== SIGN_IN_STATUSES.error) return null;
+  switch (state.error.code) {
+    case SIGN_IN_ERROR_CODES.issuerMismatch:
+      return "Done When couldn’t verify its sign-in service. You can still open existing items from their links.";
+    case SIGN_IN_ERROR_CODES.missingPendingSignIn:
+    case SIGN_IN_ERROR_CODES.stateMismatch:
+      return "Start sign-in again and finish it in the same browser tab.";
+    default:
+      return "Try signing in again from My items.";
+  }
 }
 
 /** The signed-in state, or a signed-out one when sign-in is unavailable. */
@@ -31,7 +44,7 @@ export function useSession(): SessionView {
     available: client !== null,
     signedIn: signInState.status === SIGN_IN_STATUSES.signedIn,
     pending: signInState.status === SIGN_IN_STATUSES.signingIn,
-    failed: signInState.status === SIGN_IN_STATUSES.error,
+    failure: failureMessage(signInState),
     signIn: (returnTo) => {
       void client?.signIn({ returnTo: returnTo ?? here() }).catch(() => undefined);
     },

@@ -423,6 +423,9 @@ pre.code {
   cursor: pointer;
 }
 
+.chart [data-custd-chart-action]:disabled { opacity: .55; cursor: default; }
+.page--tv .chart-navigation { display: none; }
+
 .chart [data-custd-chart-fullscreen="true"] { background: var(--color-paper); padding: var(--space-4); }
 
 .live-line {

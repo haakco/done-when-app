@@ -53,3 +53,10 @@ done-when estimate - --low 2026-12-10 --high 2026-12-20 --at 2026-11-19 --json <
 
 
 Share links give viewers read-only access. Keep owner links and sign-in credentials private.
+
+
+## Verify hosted sign-in after deployment
+
+Run `node scripts/check-hosted-sign-in.ts`. The check compares the app’s exact issuer
+and OAuth endpoints with its provider’s live metadata. Then complete sign-in from
+**My items** using an invited account and confirm the item list loads.

@@ -35,7 +35,7 @@ function MyItems({ data }: { data: DoneWhenData }) {
         <button type="button" className="button button--primary" disabled={session.pending} onClick={() => { session.signIn("/mine"); }}>
           Sign in
         </button>
-        {session.failed ? <p className="field__error">Sign-in did not finish. Try again.</p> : null}
+        {session.failure ? <p className="field__error" role="alert">{session.failure}</p> : null}
         <RecentList />
       </div>
     );

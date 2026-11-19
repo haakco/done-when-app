@@ -207,3 +207,26 @@ test("the forecast chart has a named key and a keyboard measurement inspector", 
   await expect(page.getByRole("button", { name: "Add measurement" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
+
+test("forecast controls keep the selected dates when a live measurement moves the projection", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await createCounter(page, "Chart controls", "100", HISTORY);
+  const chart = page.getByRole("figure", { name: "Forecast chart", exact: true });
+  const range = chart.getByText(/^Showing /);
+  const full = await range.textContent();
+  await chart.getByRole("button", { name: "Zoom in" }).press("Enter");
+  await expect(range).not.toHaveText(full ?? "");
+  const zoomed = await range.textContent();
+  await chart.getByRole("img").hover();
+  await page.mouse.wheel(120, 0);
+  await expect(range).not.toHaveText(zoomed ?? "");
+  const panned = await range.textContent();
+  await page.getByLabel("New value").fill("55");
+  await page.getByRole("button", { name: "Add measurement" }).click();
+  await expect(page.getByRole("progressbar", { name: "Progress to target" })).toHaveAttribute("aria-valuetext", /55 of 100/);
+  await expect(range).toHaveText(panned ?? "");
+  const reset = chart.getByRole("button", { name: "All dates" });
+  await reset.click();
+  await expect(reset).toBeDisabled();
+  await expect(range).not.toHaveText(panned ?? "");
+});

@@ -140,6 +140,8 @@ function CounterChart({ counter, detail = false, dates = forecastDates(counter.f
         data={chartData}
         title={detail ? `${counter.name}: possible paths` : counter.name}
         labels={{
+          reset: "All dates",
+          zoomToData: "Measurements only",
           empty: "The chart appears after the first measurement.",
           noForecast: dates === null ? "The forecast shows after you guess or skip." : "The forecast line appears after three measurements.",
         }}
@@ -148,6 +150,7 @@ function CounterChart({ counter, detail = false, dates = forecastDates(counter.f
         {...(narrow ? { width: 380, height: 260 } : {})}
       />
       {counter.measurements.length > 0 ? <ForecastKey projection={median !== null} interval={low !== null && high !== null} deadline={counter.deadline !== null} /> : null}
+      {counter.measurements.length > 1 ? <figcaption className="small muted chart-navigation">Zoom in, then drag or scroll sideways to move through dates.</figcaption> : null}
     </figure>
   );
 }
