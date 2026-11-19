@@ -94,6 +94,7 @@ pub struct ItemArg {
 
 #[derive(Debug, Args)]
 pub struct AddArgs {
+    /// A saved item, link, or "-" to read a capability link from stdin.
     pub item: String,
     #[arg(required_unless_present = "csv", conflicts_with = "csv")]
     pub value: Option<f64>,
@@ -192,7 +193,19 @@ pub fn dispatch(
             print(out, json, &ops::create_counter(ctx, &args.into())?)
         }
         Command::Add(args) => {
-            let report = add(ctx, &args)?;
+            let mut link = String::new();
+            let item = if args.item == "-" {
+                input.read_line(&mut link).map_err(|error| {
+                    CliError::Usage(format!("read item link from stdin: {error}"))
+                })?;
+                if crate::links::parse_link(link.trim()).is_none() {
+                    return Err(CliError::Usage("expected an item link on stdin".to_owned()));
+                }
+                link.trim()
+            } else {
+                &args.item
+            };
+            let report = add(ctx, item, &args)?;
             print(out, json, &report)?;
             report.check_outcome()
         }
@@ -237,7 +250,7 @@ pub fn dispatch(
     }
 }
 
-fn add(ctx: &Context, args: &AddArgs) -> CliResult<ops::AddReport> {
+fn add(ctx: &Context, item: &str, args: &AddArgs) -> CliResult<ops::AddReport> {
     let rows = match (&args.csv, args.value) {
         (Some(path), _) => {
             let text = std::fs::read_to_string(path)
@@ -250,7 +263,7 @@ fn add(ctx: &Context, args: &AddArgs) -> CliResult<ops::AddReport> {
         }
         (None, None) => return Err(CliError::Usage("give a value or --csv".to_owned())),
     };
-    ops::add_measurements(ctx, &args.item, &rows, args.idempotency_key.as_deref())
+    ops::add_measurements(ctx, item, &rows, args.idempotency_key.as_deref())
 }
 
 fn nonempty_key(text: &str) -> Result<String, String> {
