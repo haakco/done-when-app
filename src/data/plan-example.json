@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "inputs": {
     "asOf": "2026-12-01T00:00:00Z",
     "deadline": "2026-12-11T00:00:00Z",
@@ -45,7 +45,8 @@
         ],
         "seed": 172
       }
-    ]
+    ],
+    "measurementIntervalDays": 1
   },
   "baseline": {
     "revision": 1,
@@ -244,5 +245,35 @@
         "upper": 3
       }
     ]
+  },
+  "partForecasts": {
+    "baseline": {
+      "checks": {
+        "median": "2026-12-05T05:46:05.866049587Z",
+        "lower": "2026-12-04T22:48:00.99337512Z",
+        "upper": "2026-12-05T15:07:41.560487735Z"
+      },
+      "pages": {
+        "median": "2026-12-10T03:23:56.224884416Z",
+        "lower": "2026-12-09T17:42:31.811783632Z",
+        "upper": "2026-12-10T18:30:05.484665821Z"
+      }
+    },
+    "preview": {
+      "checks": {
+        "median": "2026-12-05T05:46:05.866049587Z",
+        "lower": "2026-12-04T22:48:00.99337512Z",
+        "upper": "2026-12-05T15:07:41.560487735Z"
+      },
+      "pages": {
+        "median": "2026-12-05T21:52:27.537486012Z",
+        "lower": "2026-12-05T01:11:31.336949547Z",
+        "upper": "2026-12-07T23:34:40.811892506Z"
+      }
+    }
+  },
+  "mostFrequentSignOffBlocker": {
+    "baseline": "pages",
+    "preview": "pages"
   }
 }

@@ -1,6 +1,7 @@
+import { ForecastChart } from "@haakco/custd-react";
 import { lazy, Suspense, useState } from "react";
 import example from "../data/plan-example.json";
-import { formatDate } from "../lib/dates";
+import { formatDate, formatShortDate } from "../lib/dates";
 import { PlanProgress } from "./PlanProgress";
 
 const PlanCanvas = lazy(() => import("./PlanCanvas"));
@@ -9,13 +10,15 @@ const parts = example.inputs.parts.map((part) => ({
   required: true,
   prerequisites: part.prerequisites ?? [],
 }));
+const DAY_MS = 86_400_000;
 const names = new Map(example.inputs.parts.map((part) => [part.id, part.name]));
 
 export default function PlanExample() {
   const [preview, setPreview] = useState(false);
   const [showCanvas, setShowCanvas] = useState(false);
   const [meetingStage, setMeetingStage] = useState<"ready" | "review" | "decide" | "ended">("ready");
-  const forecast = preview ? example.preview : example.baseline;
+  const scenario = preview ? "preview" : "baseline";
+  const forecast = example[scenario];
   function inspect(id: string) {
     const detail = document.querySelector<HTMLDetailsElement>(`#example-part-${CSS.escape(id)}`);
     if (!detail) return;
@@ -37,22 +40,45 @@ export default function PlanExample() {
         {preview ? "Reset preview" : "Preview 25 pages edited"}
       </button>
       <p>{forecast.completedParts} of {forecast.requiredParts} required parts complete</p>
+      <p>Most often blocking sign-off: {names.get(example.mostFrequentSignOffBlocker[scenario])}</p>
       <PlanProgress forecast={forecast} deadline={example.inputs.deadline} />
       <ul className="item-list">
-        {example.inputs.parts.map((part) => (
-          <li key={part.id}>
-            <details className="more" id={`example-part-${part.id}`}>
-              <summary>{part.name}</summary>
-              {part.measurements ? (
-                <p>Recorded {part.measurements.map((value, index) =>
-                  preview && index === part.measurements.length - 1 && part.previewValue !== undefined ? part.previewValue : value,
-                ).join(", ")} {part.unit}. Target {part.target} {part.unit}.</p>
-              ) : (
-                <p>Allow 1–2 days after pages and checks are both complete.</p>
-              )}
-            </details>
-          </li>
-        ))}
+        {example.inputs.parts.map((part) => {
+          const history = part.measurements?.map((value, index, values) => ({
+            at: new Date(Date.parse(example.inputs.asOf) +
+              (index - values.length + 1) * example.inputs.measurementIntervalDays * DAY_MS).toISOString(),
+            value: preview && index === values.length - 1 ? part.previewValue ?? value : value,
+          }));
+          const fit = Object.entries(example.partForecasts[scenario]).find(([id]) => id === part.id)?.[1];
+          return (
+            <li key={part.id}>
+              <details className="more" id={`example-part-${part.id}`}>
+                <summary>{part.name}</summary>
+                {history && fit && part.target !== undefined ? (
+                  <>
+                    <p>Likely done {formatDate(fit.median)} · 90% range {formatShortDate(Date.parse(fit.lower))} to {formatShortDate(Date.parse(fit.upper))}</p>
+                    <ForecastChart
+                      title={part.name}
+                      data={{
+                        observations: history,
+                        target: part.target,
+                        completionMedian: fit.median,
+                        completionInterval: { confidence: 0.9, lower: fit.lower, upper: fit.upper },
+                      }}
+                      formatDate={formatShortDate}
+                    />
+                    <p>Measurements</p>
+                    <ul>{history.map(({ at, value }) => (
+                      <li key={at}>{formatShortDate(Date.parse(at))} · {value} {part.unit}</li>
+                    ))}</ul>
+                  </>
+                ) : (
+                  <p>Allow 1–2 days after pages and checks are both complete.</p>
+                )}
+              </details>
+            </li>
+          );
+        })}
       </ul>
       <details className="more" onToggle={(event) => { setShowCanvas(event.currentTarget.open); }}>
         <summary>Dependency canvas</summary>
