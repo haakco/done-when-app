@@ -2,7 +2,7 @@
 
 import type { AppForecastMethod, AppItemAccess, AppItemLink, AppItemOwnership, AppLinkRole, AppMeeting, AppModelVersion } from "@haakco/custd-sdk/browser";
 
-export type ItemKind = "counter" | "project" | "model" | "meeting" | "dashboard";
+export type ItemKind = "counter" | "project" | "model" | "meeting" | "dashboard" | "plan";
 
 /** Owner links read and change one item; share links only read it. */
 export type Access = AppLinkRole;
@@ -151,4 +151,4 @@ export type ForecastSettings = { method: ForecastMethod; forecastFrom: string | 
 export type MeasurementsAdded = { accepted: number; rejected: number; targetReached: boolean; failure: unknown };
 
 /** "item" is a counter or a project: Custd's list does not say which until the item is read. */
-export type MyItem = { itemUuid: string; kind: "item" | "model" | "meeting" | "dashboard"; name: string; status: string; updatedAt: string };
+export type MyItem = { itemUuid: string; kind: "item" | "model" | "meeting" | "dashboard" | "plan"; name: string; status: string; updatedAt: string };

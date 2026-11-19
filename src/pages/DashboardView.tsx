@@ -88,7 +88,8 @@ function EntryCard({ data, access, entry, owner }: EntryProps) {
   else {
     name = itemNameOf(read.data);
     const kind = itemKindOf(read.data);
-    if (kind === "project") body = <ProjectEntry read={read.data} />;
+    if (kind === "plan") body = <p>{read.data.plan?.parts.length ?? 0} work parts</p>;
+    else if (kind === "project") body = <ProjectEntry read={read.data} />;
     else if (kind === "model") body = <ModelEntry access={access} read={read.data} item={entry.itemUuid} />;
     else if (kind === "meeting") body = <MeetingEntry read={read.data} />;
     else body = <CounterEntry access={access} read={read.data} item={entry.itemUuid} />;

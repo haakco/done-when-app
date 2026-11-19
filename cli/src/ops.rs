@@ -4,7 +4,7 @@
 
 use custd_sdk::{
     APP_ITEM_KIND_LINK_COLLECTION, APP_ITEM_KIND_MEASUREMENT_PROJECT, APP_ITEM_KIND_MEETING,
-    ApiError, AppClient, AppForecastStory, AppItemCreate, AppItemRead, AppLink,
+    APP_ITEM_KIND_PLAN, ApiError, AppClient, AppForecastStory, AppItemCreate, AppItemRead, AppLink,
     AppMeasurementProjectCreate, AppMeeting, AppReadOptions, Conditional, Error,
     MeasurementForecastRun, MeasurementForecastRunRequest, MeasurementObservation,
     MeasurementObservationBulk, MeasurementSeriesCreate, MeasurementTargetCreate, ProjectComplete,
@@ -125,6 +125,7 @@ pub fn kind_of_item_kind(kind: &str) -> Option<ItemKind> {
     match kind {
         APP_ITEM_KIND_LINK_COLLECTION => Some(ItemKind::Dashboard),
         APP_ITEM_KIND_MEETING => Some(ItemKind::Meeting),
+        APP_ITEM_KIND_PLAN => Some(ItemKind::Plan),
         APP_ITEM_KIND_MODEL => Some(ItemKind::Model),
         _ => None,
     }
@@ -302,6 +303,44 @@ pub struct ItemReport {
     pub entries: Vec<EntryReport>,
     pub forecast: Option<ForecastSummary>,
     pub meeting: Option<MeetingReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_forecast: Option<PlanForecastReport>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanForecastReport {
+    pub revision: i64,
+    pub as_of: String,
+    pub horizon: String,
+    pub model: String,
+    pub required_parts: u32,
+    pub completed_parts: u32,
+    pub missing_parts: Vec<String>,
+    pub median: Option<String>,
+    pub lower: Option<String>,
+    pub upper: Option<String>,
+    pub deadline_probability: Option<f64>,
+    pub horizon_miss_fraction: Option<f64>,
+}
+
+impl From<custd_sdk::AppPlanForecast> for PlanForecastReport {
+    fn from(forecast: custd_sdk::AppPlanForecast) -> Self {
+        Self {
+            revision: forecast.revision,
+            as_of: forecast.as_of,
+            horizon: forecast.horizon,
+            model: forecast.model,
+            required_parts: forecast.required_parts,
+            completed_parts: forecast.completed_parts,
+            missing_parts: forecast.missing_parts,
+            median: forecast.median,
+            lower: forecast.lower,
+            upper: forecast.upper,
+            deadline_probability: forecast.deadline_probability,
+            horizon_miss_fraction: forecast.horizon_miss_fraction,
+        }
+    }
 }
 
 /// A meeting as it runs; the CLI only reads meetings.
@@ -696,7 +735,12 @@ pub fn show(ctx: &Context, reference: &str) -> CliResult<ItemReport> {
         }
         _ => None,
     };
-    Ok(item_report(&read, kind, resolved.stored.as_ref(), forecast))
+    let mut report = item_report(&read, kind, resolved.stored.as_ref(), forecast);
+    if kind == ItemKind::Plan {
+        let app = ctx.app()?;
+        report.plan_forecast = Some(resolved.link(&app).plan_forecast()?.into());
+    }
+    Ok(report)
 }
 
 /// The counter's unit: its series name, when that is not just the counter's name.
@@ -732,7 +776,8 @@ pub fn item_report(
         unit: project.and_then(unit_label),
         deadline: target
             .and_then(|t| t.target_date.clone())
-            .or_else(|| project.and_then(|p| p.delivery.target_date.clone())),
+            .or_else(|| project.and_then(|p| p.delivery.target_date.clone()))
+            .or_else(|| read.plan.as_ref().and_then(|plan| plan.deadline.clone())),
         expires_at: read.item.expires_at.clone(),
         estimates: read
             .estimates
@@ -757,6 +802,7 @@ pub fn item_report(
             .collect(),
         forecast,
         meeting: meeting.map(MeetingReport::from_meeting),
+        plan_forecast: None,
     }
 }
 

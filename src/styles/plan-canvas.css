@@ -1,0 +1,5 @@
+.plan-canvas {
+  height: min(380px, 65vh);
+  min-height: 220px;
+  width: 100%;
+}

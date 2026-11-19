@@ -73,6 +73,27 @@ impl Report for ItemReport {
             None if self.kind == ItemKind::Counter => lines.push("No forecast yet.".to_owned()),
             None => {}
         }
+        if let Some(plan) = &self.plan_forecast {
+            lines.push(format!(
+                "{} of {} required parts complete",
+                plan.completed_parts, plan.required_parts
+            ));
+            if let Some(median) = &plan.median {
+                lines.push(format!("Likely done {median}"));
+            }
+            if let (Some(lower), Some(upper)) = (&plan.lower, &plan.upper) {
+                lines.push(format!("90% range {lower} to {upper}"));
+            }
+            if let Some(chance) = plan.deadline_probability {
+                lines.push(format!("{:.0}% chance by the deadline", chance * 100.0));
+            }
+            if !plan.missing_parts.is_empty() {
+                lines.push(format!(
+                    "{} parts still need forecast evidence",
+                    plan.missing_parts.len()
+                ));
+            }
+        }
         if let Some(meeting) = &self.meeting {
             lines.extend(meeting_lines(meeting));
         }

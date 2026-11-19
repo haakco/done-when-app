@@ -15,6 +15,7 @@ const RULE_CHOICES: Record<ItemKind, AppAlertRuleType[]> = {
   model: [],
   meeting: [],
   dashboard: [],
+  plan: [],
 };
 
 const RULE_LABEL: Record<AppAlertRuleType, string> = {

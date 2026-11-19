@@ -17,6 +17,7 @@ export function MyItemsPage() {
         <Link className="button" to="/new/counter">New counter</Link>
         <Link className="button" to="/new/project">New project</Link>
         <Link className="button" to="/new/meeting">New meeting</Link>
+        <Link className="button" to="/new/plan">New plan</Link>
         <Link className="button" to="/new/dashboard">New dashboard</Link>
       </nav>
       <WithData>{({ data }) => <MyItems data={data} />}</WithData>

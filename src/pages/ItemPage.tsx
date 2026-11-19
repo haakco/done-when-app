@@ -13,6 +13,7 @@ import { CounterView } from "./CounterView";
 import { DashboardView } from "./DashboardView";
 import { MeetingView } from "./MeetingView";
 import { ModelView } from "./ModelView";
+import { PlanView } from "./PlanView";
 import { ProjectView } from "./ProjectView";
 
 /** `/c/<share token>`, `/p/…`, `/m/…`, `/meet/…`, `/d/…`: the read-only page. */
@@ -67,6 +68,7 @@ function ItemPage({ data, access, route }: ItemPageProps) {
   if (read.status === "error") return <ItemFailed error={read.error} what="item" />;
   // Big-screen mode shows the item as any viewer sees it, with no owner tools.
   const view = { data, access, read: read.data, live: read, showOwnerTools: !tv && route === "owner" && role === APP_LINK_ROLES.owner, ownerRoute: !tv && route === "owner", tv };
+  if (kind === "plan") return <PlanView {...view} />;
   if (kind === "dashboard") return <DashboardView {...view} />;
   if (kind === "project") return <ProjectView {...view} />;
   if (kind === "model") return <ModelView {...view} />;

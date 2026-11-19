@@ -11,6 +11,7 @@ pub enum ItemKind {
     Model,
     Meeting,
     Dashboard,
+    Plan,
 }
 
 impl ItemKind {
@@ -21,6 +22,7 @@ impl ItemKind {
             ItemKind::Model => "m",
             ItemKind::Meeting => "meet",
             ItemKind::Dashboard => "d",
+            ItemKind::Plan => "plan",
         }
     }
 
@@ -31,6 +33,7 @@ impl ItemKind {
             "m" => Some(ItemKind::Model),
             "meet" => Some(ItemKind::Meeting),
             "d" => Some(ItemKind::Dashboard),
+            "plan" => Some(ItemKind::Plan),
             _ => None,
         }
     }
@@ -42,6 +45,7 @@ impl ItemKind {
             ItemKind::Model => "model",
             ItemKind::Meeting => "meeting",
             ItemKind::Dashboard => "dashboard",
+            ItemKind::Plan => "plan",
         }
     }
 }
@@ -56,7 +60,9 @@ pub enum Access {
 pub fn item_url(host: &str, kind: ItemKind, access: Access, token: &str) -> String {
     let segment = kind.segment();
     match access {
-        Access::Owner if kind == ItemKind::Meeting => format!("{host}/edit/{segment}#{token}"),
+        Access::Owner if matches!(kind, ItemKind::Meeting | ItemKind::Plan) => {
+            format!("{host}/edit/{segment}#{token}")
+        }
         Access::Owner => format!("{host}/edit/{segment}/{token}"),
         Access::Share => format!("{host}/{segment}/{token}"),
     }
@@ -64,7 +70,7 @@ pub fn item_url(host: &str, kind: ItemKind, access: Access, token: &str) -> Stri
 
 /// The share-card image the delivery service renders for a share link (A5).
 pub fn card_url(host: &str, kind: ItemKind, share_token: &str) -> Option<String> {
-    if kind == ItemKind::Meeting {
+    if matches!(kind, ItemKind::Meeting | ItemKind::Plan) {
         return None;
     }
     Some(format!(

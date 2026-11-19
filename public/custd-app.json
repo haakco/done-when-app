@@ -15,6 +15,10 @@
       "file": "index.html"
     },
     {
+      "prefix": "/plan/",
+      "file": "index.html"
+    },
+    {
       "prefix": "/d/",
       "file": "index.html"
     },

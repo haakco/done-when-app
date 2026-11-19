@@ -42,6 +42,11 @@ pub const OPERATIONS: &[(&str, Coverage)] = &[
         "AppLink::forecast_story",
         Command("watch (measurement history)"),
     ),
+    ("AppLink::plan_forecast", Command("show")),
+    (
+        "AppLink::update_plan",
+        Deferred("edit dependencies on the web plan page"),
+    ),
     ("AppLink::start_meeting", MEETING_STEP),
     ("AppLink::advance_meeting", MEETING_STEP),
     ("AppLink::end_meeting", MEETING_STEP),

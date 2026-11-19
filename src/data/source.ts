@@ -11,6 +11,8 @@ import {
   APP_MEETING_ERROR_CODES,
   AppItemError,
   type AppItemRead,
+  type AppPlanForecast,
+  type AppPlanUpdate,
   type AppItemsClient,
   type AppMeasurementBulkResponse,
   type AppModelRunRequest,
@@ -77,6 +79,10 @@ export type DoneWhenData = {
   /** Finishes `blockUuid`, the block on now; a repeat is a no-op, a stale block a 409 the caller can ignore. */
   advanceMeeting(owner: ItemAccess, blockUuid: string): Promise<void>;
   endMeeting(owner: ItemAccess): Promise<void>;
+
+  createPlan(name: string): Promise<CreatedItem>;
+  updatePlan(access: ItemAccess, update: AppPlanUpdate): Promise<AppItemRead>;
+  planForecast(access: ItemAccess): Promise<AppPlanForecast>;
 
   createDashboard(draft: DashboardDraft): Promise<CreatedItem>;
   /** One summary per dashboard item, read once for a download. */
@@ -211,6 +217,12 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
       await items.endMeeting(owner);
     },
 
+    async createPlan(name) {
+      return created("plan", await items.createItem({ kind: APP_ITEM_KINDS.plan, name }));
+    },
+    updatePlan: (access, update) => items.updatePlan(access, update),
+    planForecast: (access) => items.planForecast(access),
+
     async createDashboard(draft) {
       const result = await items.createItem({ kind: APP_ITEM_KINDS.linkCollection, idleExpirySeconds: draft.expiresAfterSeconds });
       for (const pasted of draft.entryRefs) {
@@ -267,6 +279,7 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
 }
 
 function myItemKind(kind: string): MyItem["kind"] {
+  if (kind === APP_ITEM_KINDS.plan) return "plan";
   if (kind === APP_ITEM_KINDS.linkCollection) return "dashboard";
   if (kind === APP_ITEM_KINDS.uncertaintyModel) return "model";
   if (kind === APP_ITEM_KINDS.meeting) return "meeting";

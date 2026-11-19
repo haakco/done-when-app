@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { forgetRecent, recentItems, subscribeDevice } from "../lib/device";
 import { formatDate } from "../lib/dates";
 
-const KIND_LABEL = { counter: "Counter", project: "Project", model: "Model", meeting: "Meeting", dashboard: "Dashboard" } as const;
+const KIND_LABEL = { counter: "Counter", project: "Project", model: "Model", meeting: "Meeting", dashboard: "Dashboard", plan: "Plan" } as const;
 
 function snapshot(): string {
   return JSON.stringify(recentItems());

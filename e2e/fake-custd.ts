@@ -25,6 +25,7 @@ import type {
   AppProjectEstimateList,
   HostedAppDiscovery,
 } from "@haakco/custd-sdk/browser";
+import type { AppPlan, AppPlanUpdate } from "@haakco/custd-sdk/browser";
 import type { AppAlertDelivery, AppAlertRule, AppAlertRuleSpec, AppAlertSettings, AppAlertWebhook } from "@haakco/custd-sdk/browser";
 
 export type FakeRequest = { method: string; url: string; headers: Record<string, string>; body: string | null };
@@ -48,6 +49,7 @@ type Stored = {
   updatedAt: string;
   ownerUser: string | null;
   project?: AppMeasurementProject;
+  plan?: AppPlan;
   model?: AppUncertaintyModel;
   meeting?: AppMeeting & { lastFinished: string | null };
   modelRuns: AppModelRun[];
@@ -172,6 +174,18 @@ export class FakeCustd {
         return this.conditional(request, `"${caller.item.version}"`, () => this.read(caller));
       case "PATCH /api/v1/app/item":
         return json(200, this.change(caller, () => { this.settings(caller.item, body); }));
+      case "PATCH /api/v1/app/item/plan":
+        return json(200, this.change(caller, () => { this.updatePlan(caller.item, body as AppPlanUpdate); }));
+      case "GET /api/v1/app/item/plan/forecast": {
+        const plan = caller.item.plan;
+        if (!plan) throw new Problem(409, "app_item_wrong_kind");
+        const requiredParts = plan.parts.filter((part) => part.required).length;
+        return json(200, {
+          revision: plan.revision, asOf: caller.item.updatedAt, horizon: "2036-11-19T00:00:00Z",
+          model: "independent_finish_to_start_v1", requiredParts, completedParts: 0, missingParts: [],
+          ...(requiredParts ? { median: "2026-12-05T00:00:00Z", deadlineProbability: 0.75 } : {}),
+        });
+      }
       case "POST /api/v1/app/item/claim":
         return json(200, this.claim(caller));
       case "POST /api/v1/app/item/measurements":
@@ -253,7 +267,8 @@ export class FakeCustd {
       if (!link || !item) throw new Problem(401, "app_link_refused");
       if (itemParam && itemParam !== item.uuid) {
         const entry = item.entries.find((candidate) => candidate.itemUuid === itemParam);
-        const target = entry ? this.items.get(entry.itemUuid) : undefined;
+        const included = entry || item.plan?.parts.some((part) => part.itemUuid === itemParam);
+        const target = included ? this.items.get(itemParam) : undefined;
         if (!target) throw new Problem(404, "app_item_not_found");
         return { item: target, role: "share", user, viaCollection: true };
       }
@@ -306,6 +321,7 @@ export class FakeCustd {
       modelRuns: [],
       alerts: { rules: [], webhooks: [], subscribers: new Set(), deliveries: [] },
     };
+    if (request.kind === "plan") item.plan = { revision: 1, parts: [] };
     if (request.kind === "uncertainty_model") {
       const create = request.uncertaintyModel;
       item.model = { modelUuid: crypto.randomUUID(), name: create.name, description: create.description ?? "", latestVersion: 0, createdAt: now, updatedAt: now };
@@ -356,6 +372,19 @@ export class FakeCustd {
     return { link: { linkUuid: link?.linkUuid ?? "", role: old.role, createdAt: link?.createdAt ?? "" }, token };
   }
 
+  private updatePlan(item: Stored, request: AppPlanUpdate): void {
+    if (!item.plan || request.expectedRevision !== item.plan.revision) {
+      throw new Problem(409, "app_plan_revision_conflict");
+    }
+    const existing = new Set(item.plan.parts.map((part) => part.itemUuid));
+    const parts = request.parts.map(({ itemUuid, required, prerequisites, linkToken }) => {
+      const link = linkToken ? this.links.get(linkToken) : null;
+      if (!existing.has(itemUuid) && link?.itemUuid !== itemUuid) throw new Problem(404, "app_item_not_found");
+      return { itemUuid, required, prerequisites };
+    });
+    item.plan = { revision: item.version + 1, parts, ...(request.deadline ? { deadline: request.deadline } : {}) };
+  }
+
   private read(caller: Caller): AppItemRead {
     const { item } = caller;
     const ownership = item.ownerUser === null ? "unowned" : item.ownerUser === caller.user ? "yours" : "other";
@@ -381,6 +410,7 @@ export class FakeCustd {
       read.estimates = this.estimateList(item);
     }
     if (item.kind === "link_collection") read.linkCollection = { entries: item.entries };
+    if (item.plan) read.plan = structuredClone(item.plan);
     if (item.model) read.uncertaintyModel = structuredClone(item.model);
     if (item.meeting) read.meeting = meetingRead(item.meeting);
     return read;

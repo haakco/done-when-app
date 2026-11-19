@@ -1,3 +1,4 @@
+import { NewPlanPage } from "./pages/NewPlanPage";
 import { Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { ApiPage } from "./pages/ApiPage";
@@ -22,6 +23,8 @@ export function App() {
         <Route path="new/project" element={<NewProjectPage />} />
         <Route path="new/model" element={<NewModelPage />} />
         <Route path="new/meeting" element={<NewMeetingPage />} />
+        <Route path="new/plan" element={<NewPlanPage />} />
+        <Route path="plan/:token" element={<SharePage />} />
         <Route path="new/dashboard" element={<NewDashboardPage />} />
         <Route path="c/:token" element={<SharePage />} />
         <Route path="p/:token" element={<SharePage />} />

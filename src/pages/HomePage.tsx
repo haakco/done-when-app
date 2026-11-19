@@ -42,6 +42,12 @@ export function HomePage() {
           </li>
           <li className="card">
             <h3>
+              <Link to="/new/plan">Build a plan</Link>
+            </h3>
+            <p className="muted small">Connect work that depends on other parts and see when the whole plan could finish.</p>
+          </li>
+          <li className="card">
+            <h3>
               <Link to="/new/dashboard">Make a dashboard</Link>
             </h3>
             <p className="muted small">Put counters, projects, models and meetings on one screen that updates itself.</p>

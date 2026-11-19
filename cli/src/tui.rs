@@ -32,7 +32,7 @@ impl View {
                     .filter(|item| {
                         matches!(
                             item.kind,
-                            Some(ItemKind::Counter | ItemKind::Project) | None
+                            Some(ItemKind::Counter | ItemKind::Project | ItemKind::Plan) | None
                         )
                     })
                     .collect();

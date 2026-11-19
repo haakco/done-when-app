@@ -29,6 +29,10 @@ export async function dashboardRow(items: AppItemsClient, access: AppItemAccess,
     const read = dataOf(await items.readItem(access, options));
     const updatedAt = new Date(read.item.updatedAt);
     const kind = itemKindOf(read);
+    if (kind === "plan") {
+      const count = read.plan?.parts.length ?? 0;
+      return { name: "Plan", kind, status: "", headline: `${count} work parts`, detail: "", updatedAt };
+    }
     if (kind === "project") {
       const project = toProject(read);
       const summary = projectSummary(project);
