@@ -1,6 +1,6 @@
 [package]
 name = "done-when"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Done When on the command line: counters, forecasts, a live terminal view and an MCP server."
 license = "MIT"
