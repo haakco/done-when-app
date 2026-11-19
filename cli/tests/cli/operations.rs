@@ -5,11 +5,12 @@ use std::process::Command;
 
 use done_when::operations::{NOT_OPERATIONS, OPERATIONS};
 
-const SDK_SOURCES: [&str; 8] = [
+const SDK_SOURCES: [&str; 9] = [
     "src/app.rs",
     "src/app_alerts.rs",
     "src/app_meetings.rs",
     "src/app_story.rs",
+    "src/browser_login.rs",
     "src/client.rs",
     "src/device.rs",
     "src/discovery.rs",
@@ -18,7 +19,13 @@ const SDK_SOURCES: [&str; 8] = [
 
 fn sdk_root() -> PathBuf {
     let output = Command::new(env!("CARGO"))
-        .args(["metadata", "--format-version", "1", "--manifest-path"])
+        .args([
+            "metadata",
+            "--locked",
+            "--format-version",
+            "1",
+            "--manifest-path",
+        ])
         .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"))
         .output()
         .unwrap();

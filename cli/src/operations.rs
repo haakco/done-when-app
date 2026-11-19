@@ -20,10 +20,14 @@ const MEETING_STEP: Coverage =
 const ALERTS: Coverage = Deferred("alerts are set up on the web owner page");
 
 pub const OPERATIONS: &[(&str, Coverage)] = &[
-    ("DeviceLogin::run", Command("login")),
+    ("BrowserLogin::run", Command("login")),
+    (
+        "DeviceLogin::run",
+        Deferred("hosted app sign-in uses browser PKCE"),
+    ),
     (
         "device_user_code_groups",
-        Command("login (the code prompt)"),
+        Deferred("device codes do not grant hosted application authority"),
     ),
     (
         "read_hosted_app_discovery",
@@ -46,6 +50,7 @@ pub const OPERATIONS: &[(&str, Coverage)] = &[
     ("AppLink::add_alert_rule", ALERTS),
     ("AppLink::remove_alert_rule", ALERTS),
     ("AppLink::add_alert_webhook", ALERTS),
+    ("AppLink::add_alert_slack", ALERTS),
     ("AppLink::remove_alert_webhook", ALERTS),
     ("AppLink::subscribe_alert_email", ALERTS),
     ("AppLink::unsubscribe_alert_email", ALERTS),
@@ -117,6 +122,7 @@ pub const OPERATIONS: &[(&str, Coverage)] = &[
 /// Public SDK functions that build clients rather than call the API. `with_user_token` is
 /// applied to every app client while a session is valid; `owned_item` reaches "my items".
 pub const NOT_OPERATIONS: &[&str] = &[
+    "BrowserLogin::new",
     "AppClient::new",
     "AppClient::from_discovery",
     "AppClient::with_user_token",

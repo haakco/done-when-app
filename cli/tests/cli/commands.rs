@@ -200,10 +200,11 @@ fn login_saves_the_session_without_printing_it() {
     ])
     .unwrap();
     let mut ctx = done_when::context::Context::new(&api.base_url, dir.to_path_buf());
-    ctx.login_runner = |login, _| {
+    ctx.login_runner = |login, scopes, _| {
+        assert!(!scopes.is_empty());
         assert_eq!(
-            (login.client_id.as_str(), login.audience.as_deref()),
-            ("done-when", Some("custd"))
+            (login.client_id.as_str(), login.audience.as_str()),
+            ("done-when", "custd")
         );
         Ok(custd_sdk::DeviceToken {
             access_token: "user-token-1".to_owned(),

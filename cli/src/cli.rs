@@ -30,7 +30,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Sign in with a code shown here and approved in a browser.
+    /// Sign in to a hosted app using your local browser.
     Login,
     /// Start a new item.
     #[command(subcommand)]

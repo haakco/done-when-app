@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use custd_sdk::{
-    AppClient, DeviceInstructions, DeviceLogin, DeviceToken, HostedAppDiscovery,
+    AppClient, BrowserLogin, DeviceToken, HostedAppDiscovery, HostedAppSignIn,
     read_hosted_app_discovery,
 };
 
@@ -21,8 +21,11 @@ pub const DEFAULT_HOST: &str = "https://done-when.custd.dev";
 const FETCH_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_CARD_BYTES: u64 = 4 << 20;
 
-/// Runs the device login; replaced in tests, because the SDK requires an HTTPS issuer.
-pub type LoginRunner = fn(&DeviceLogin, &mut dyn Write) -> custd_sdk::Result<DeviceToken>;
+const LOGIN_CALLBACK: &str = "http://localhost:43159/callback";
+
+/// Runs browser sign-in against the hosted app’s OAuth client.
+pub type LoginRunner =
+    fn(&HostedAppSignIn, Vec<String>, &mut dyn Write) -> custd_sdk::Result<DeviceToken>;
 
 pub struct Context {
     /// The app's origin, for example `https://done-when.custd.dev`.
@@ -37,7 +40,7 @@ impl Context {
         Self {
             host: host.into().trim_end_matches('/').to_owned(),
             config_dir,
-            login_runner: device_login,
+            login_runner: browser_login,
             discovery: OnceCell::new(),
         }
     }
@@ -86,15 +89,15 @@ impl Context {
     }
 }
 
-fn device_login(login: &DeviceLogin, out: &mut dyn Write) -> custd_sdk::Result<DeviceToken> {
-    login.run(|instructions: &DeviceInstructions| {
-        let code = custd_sdk::device_user_code_groups(&instructions.user_code).join("-");
-        // The prompt is best effort; the login itself reports any failure.
+fn browser_login(
+    sign_in: &HostedAppSignIn,
+    scopes: Vec<String>,
+    out: &mut dyn Write,
+) -> custd_sdk::Result<DeviceToken> {
+    BrowserLogin::new(sign_in, LOGIN_CALLBACK.to_owned(), scopes).run(|url| {
         let _ = writeln!(
             out,
-            "Open {} and enter the code {code} (valid for {} minutes).",
-            instructions.verification_uri,
-            instructions.expires_in.as_secs() / 60
+            "Open this URL in your local browser to sign in:\n{url}"
         );
         let _ = out.flush();
     })

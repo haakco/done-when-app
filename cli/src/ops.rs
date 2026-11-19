@@ -5,7 +5,7 @@
 use custd_sdk::{
     APP_ITEM_KIND_LINK_COLLECTION, APP_ITEM_KIND_MEASUREMENT_PROJECT, APP_ITEM_KIND_MEETING,
     ApiError, AppClient, AppForecastStory, AppItemCreate, AppItemRead, AppLink,
-    AppMeasurementProjectCreate, AppMeeting, AppReadOptions, Conditional, DeviceLogin, Error,
+    AppMeasurementProjectCreate, AppMeeting, AppReadOptions, Conditional, Error,
     MeasurementForecastRun, MeasurementForecastRunRequest, MeasurementObservation,
     MeasurementObservationBulk, MeasurementSeriesCreate, MeasurementTargetCreate, ProjectComplete,
     ProjectEstimateCreate,
@@ -1033,15 +1033,13 @@ pub fn login(ctx: &Context, prompt: &mut dyn std::io::Write) -> CliResult<LoginR
     let sign_in = ctx
         .discovery()?
         .sign_in
-        .clone()
+        .as_ref()
         .ok_or_else(|| CliError::Usage(format!("{} does not offer sign-in", ctx.host)))?;
-    let login = DeviceLogin {
-        issuer_url: sign_in.issuer,
-        client_id: sign_in.client_id,
-        scopes: SIGN_IN_SCOPES.iter().map(|s| (*s).to_owned()).collect(),
-        audience: Some(sign_in.audience),
-    };
-    let token = (ctx.login_runner)(&login, prompt)?;
+    let scopes = SIGN_IN_SCOPES
+        .iter()
+        .map(|scope| (*scope).to_owned())
+        .collect();
+    let token = (ctx.login_runner)(sign_in, scopes, prompt)?;
     let expires_at = now_seconds() + token.expires_in.as_secs() as i64;
     let mut store = ctx.load_store()?;
     store.set_session(StoredSession {
