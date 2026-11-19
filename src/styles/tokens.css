@@ -22,6 +22,7 @@
   --space-12: 3rem;
 
   --width-page: 46rem;
+  --width-landing: 64rem;
   --radius: 6px;
   --border: 1px solid var(--color-line);
   --focus-ring: 3px solid var(--color-finish);

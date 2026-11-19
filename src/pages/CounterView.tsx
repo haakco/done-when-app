@@ -7,7 +7,7 @@ import type { CreatedState, CounterFormValues } from "../components/CounterForm"
 import { Field } from "../components/Field";
 import { ItemFailed, Loading, ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
-import { ForecastMove, useGlidingForecast } from "../components/LiveForecast";
+import { ForecastKey, ForecastMove, useGlidingForecast } from "../components/LiveForecast";
 import { CounterMoments } from "../components/Moments";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { ImportPanel } from "../components/ImportPanel";
@@ -19,7 +19,7 @@ import { ItemHeader } from "../components/ItemHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Counter, DoneWhenData, ForecastMethod, ItemAccess, Measurement } from "../data";
 import { useCounter } from "../data/live";
-import { dateInputToRfc3339, formatShortDate, rfc3339ToDateInput } from "../lib/dates";
+import { dateInputToRfc3339, formatDate, formatShortDate, rfc3339ToDateInput } from "../lib/dates";
 import { counterWorkbook } from "../lib/exports";
 import { counterSummary } from "../lib/forecast-text";
 import { MAX_ITEM_MEASUREMENTS, parseMeasurementTable } from "../lib/imports";
@@ -105,6 +105,7 @@ function LiveCounterChart({ counter, hideForecast }: { counter: Counter; hideFor
     <>
       <CounterChart counter={counter} dates={hideForecast ? null : shown} moving={moving} />
       <ForecastMove text={hideForecast || counter.status === "completed" ? "" : announcement} />
+      {counter.measurements.length > 1 ? <MeasurementInspector measurements={counter.measurements} unit={counter.unit} /> : null}
     </>
   );
 }
@@ -146,7 +147,28 @@ function CounterChart({ counter, detail = false, dates = forecastDates(counter.f
         formatDate={formatShortDate}
         {...(narrow ? { width: 380, height: 260 } : {})}
       />
+      {counter.measurements.length > 0 ? <ForecastKey projection={median !== null} interval={low !== null && high !== null} deadline={counter.deadline !== null} /> : null}
     </figure>
+  );
+}
+
+function MeasurementInspector({ measurements, unit }: { measurements: Measurement[]; unit: string }) {
+  const id = useId();
+  const [selected, setSelected] = useState<number | null>(null);
+  const last = measurements.length - 1;
+  const index = Math.min(selected ?? last, last);
+  const row = measurements[index];
+  if (!row) return null;
+  const point = `${formatDate(row.measuredAt)}: ${row.value.toLocaleString("en")}${unit ? ` ${unit}` : ""}`;
+  return (
+    <details className="quiet-details measurement-inspector">
+      <summary>Inspect measurements</summary>
+      <div className="measurement-inspector__body">
+        <label htmlFor={id}>Measurement {index + 1} of {measurements.length}</label>
+        <input id={id} type="range" min={0} max={last} value={index} aria-valuetext={point} onChange={(event) => { setSelected(event.target.valueAsNumber); }} />
+        <output htmlFor={id}>{point}</output>
+      </div>
+    </details>
   );
 }
 

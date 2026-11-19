@@ -112,6 +112,29 @@ a { color: var(--color-finish); text-underline-offset: 0.2em; }
   margin-bottom: var(--space-4);
 }
 
+.page:has(.home-start) { max-width: var(--width-landing); }
+.home-hero { max-width: 17ch; }
+
+.home-start {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 42rem) {
+  .home-start { grid-template-columns: minmax(0, 1fr); }
+}
+
+.forecast-example { border-top: 3px solid var(--color-forecast); }
+.forecast-example__label { color: var(--color-forecast); font-weight: 650; font-size: var(--text-sm); }
+.forecast-example__answer { font: 700 var(--text-xl) / 1.2 var(--font-display); margin-bottom: var(--space-1); }
+.chart.forecast-example__chart { min-height: 0; margin: var(--space-3) 0; }
+.forecast-example__toggle { margin-top: var(--space-3); }
+/* The SDK uses inline display styles on its navigation toolbar. */
+.forecast-example__chart [data-custd-chart-controls] { display: none !important; }
+.forecast-example .forecast-move { margin-top: var(--space-2); }
+
 .lede { font-size: var(--text-lg); color: var(--color-ink-muted); }
 .muted { color: var(--color-ink-muted); }
 .small { font-size: var(--text-sm); }
@@ -334,7 +357,8 @@ pre.code {
 .copy__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .copy .link-text { margin: var(--space-2) 0 0; color: var(--color-ink-muted); }
 
-.item {
+.item,
+.forecast-example {
   --custd-chart-observed: var(--color-ink);
   --custd-chart-forecast: var(--color-forecast);
   --custd-chart-band: var(--color-forecast-soft);
@@ -353,6 +377,31 @@ pre.code {
 }
 
 .chart svg { max-width: 100%; height: auto; display: block; }
+
+.forecast-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.forecast-key li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.forecast-key li span { display: inline-block; width: 1rem; flex: none; }
+.forecast-key .forecast-key__actual { width: 0.45rem; height: 0.45rem; margin-inline: 0.275rem; border-radius: 50%; background: var(--color-ink); }
+.forecast-key__projection { border-top: 2px dashed var(--color-forecast); }
+.forecast-key__interval { height: 0.65rem; background: var(--color-forecast-soft); border: 1px solid var(--color-forecast); }
+.forecast-key__target { border-top: 2px dotted var(--color-finish); }
+.forecast-key__deadline { border-top: 2px solid var(--color-warn); }
+
+.measurement-inspector { margin-top: var(--space-3); font-size: var(--text-sm); }
+.measurement-inspector__body { display: grid; gap: var(--space-2); padding-block: var(--space-2); }
+.measurement-inspector input { width: min(100%, 20rem); accent-color: var(--color-forecast); }
+.page--tv .measurement-inspector { display: none; }
+
 
 .chart [data-custd-chart-controls] {
   display: flex;

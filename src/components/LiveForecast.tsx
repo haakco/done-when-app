@@ -58,3 +58,16 @@ export function ForecastMove({ text }: { text: string }) {
     </p>
   );
 }
+
+/** Labels match the chart's line, point and band shapes so colour is optional. */
+export function ForecastKey({ projection, interval, deadline = false }: { projection: boolean; interval: boolean; deadline?: boolean }) {
+  return (
+    <ul className="forecast-key" aria-label="Chart key">
+      <li><span className="forecast-key__actual" aria-hidden="true" />Actual measurements</li>
+      {projection ? <li><span className="forecast-key__projection" aria-hidden="true" />Projected progress</li> : null}
+      {interval ? <li><span className="forecast-key__interval" aria-hidden="true" />90% forecast range</li> : null}
+      <li><span className="forecast-key__target" aria-hidden="true" />Target</li>
+      {deadline ? <li><span className="forecast-key__deadline" aria-hidden="true" />Deadline</li> : null}
+    </ul>
+  );
+}

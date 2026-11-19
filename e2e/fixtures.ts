@@ -35,7 +35,7 @@ export { expect } from "@playwright/test";
 export async function createCounter(page: Page, name: string, target: string, history?: string): Promise<void> {
   await page.goto("/");
   await page.getByLabel("What are you counting?").fill(name);
-  await page.getByLabel("Target").fill(target);
+  await page.getByRole("spinbutton", { name: "Target", exact: true }).fill(target);
   if (history !== undefined) {
     await page.getByText("More options: unit, start value, past numbers, deadline").click();
     await page.getByLabel("Past numbers (optional)").fill(history);

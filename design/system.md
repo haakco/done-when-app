@@ -29,8 +29,9 @@ It should feel personal and a little playful, never like an operations console.
   measurements, forecast settings, runs, alerts, links and expiry. Share and owner pages read
   the same from the top.
 - The home page holds the create-counter form itself: two fields (name, target) and "Create
-  counter"; the free-text unit and everything else wait behind "More options". Below it: project,
-  model and dashboard starts, then "Recent on this device".
+  counter"; the free-text unit and everything else wait behind "More options". A sample forecast beside
+  the form uses fixture data. On narrow screens the form comes first. Below it: project, model,
+  meeting and dashboard starts, then "Recent on this device".
 - Header: wordmark (home link), "New counter", "New project", "My items", "API" (new dashboard
   starts from home). Skip link to `main`.
 - Grids (`.card-grid`, `.field-row`) wrap with `auto-fit`, so narrow screens stack without breakpoints.

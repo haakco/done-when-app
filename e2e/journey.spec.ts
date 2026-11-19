@@ -57,6 +57,8 @@ test("create a counter from CSV, share it live, set an alert, then sign in and c
 
 test("a share link cannot edit, even on the owner page", async ({ page }) => {
   await createCounter(page, "Laps", "10");
+  await expect(page.getByText("Forecast coming soon")).toBeVisible();
+  await expect(page.getByText(/Add 2 more measurements/)).toBeVisible();
   const shareUrl = await copyShareUrl(page);
   const shareToken = shareUrl.split("/").at(-1) ?? "";
   await page.goto(`/edit/c#${shareToken}`);
@@ -104,7 +106,7 @@ test("a dashboard adds and removes an item", async ({ page }) => {
 test("bad CSV rows are listed by line and nothing is created", async ({ page, fake }) => {
   await page.goto("/new/counter");
   await page.getByLabel("What are you counting?").fill("Bad import");
-  await page.getByLabel("Target").fill("5");
+  await page.getByRole("spinbutton", { name: "Target", exact: true }).fill("5");
   await page.getByLabel("Past numbers (optional)").fill("2026-11-01T00:00:00Z,1\nnot-a-date,2");
   await page.getByRole("button", { name: "Create counter" }).click();
   await expect(page.getByText("Line 2: “not-a-date” is not a date")).toBeVisible();
@@ -158,4 +160,50 @@ test("a model is built, run and shown on a dashboard", async ({ page }) => {
   await page.getByRole("button", { name: "Create dashboard" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "Monthly cost" })).toBeVisible();
   await expect(page.getByText(/total: about 22\.5/)).toBeVisible();
+});
+
+test("the landing forecast can be tried on a phone without creating an item", async ({ page, fake }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const example = page.getByRole("region", { name: "Write 100 pages" });
+  const chart = example.getByRole("figure", { name: "Example forecast" });
+  await expect(example.getByRole("progressbar", { name: "Example progress" })).toHaveAttribute("aria-valuetext", /37 of 100/);
+  await example.getByRole("button", { name: "Try adding 24 pages" }).press("Enter");
+  await expect(example.getByRole("progressbar", { name: "Example progress" })).toHaveAttribute("aria-valuetext", /61 of 100/);
+  await expect(example.getByRole("status").filter({ hasText: "Forecast moved" })).toContainText("Forecast moved 3 days earlier");
+  await expect(chart).toHaveAttribute("data-forecast-motion", "still");
+  expect(fake.requests.filter((request) => request.method === "POST")).toHaveLength(0);
+  await expect(page.getByRole("button", { name: "Create counter", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test("the forecast chart has a named key and a keyboard measurement inspector", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByLabel("What are you counting?").fill("Read the chart");
+  await page.getByRole("spinbutton", { name: "Target", exact: true }).fill("100");
+  await page.getByText("More options: unit, start value, past numbers, deadline").click();
+  await page.getByLabel("Past numbers (optional)").fill(HISTORY);
+  await page.getByLabel("Deadline", { exact: true }).fill("2026-11-05");
+  await page.getByRole("button", { name: "Create counter" }).click();
+  await expect(page.getByText(/1% chance by the Nov 5, 2026 deadline/)).toBeVisible();
+  const figure = page.getByRole("figure", { name: "Forecast chart", exact: true });
+  const key = figure.getByRole("list", { name: "Chart key" });
+  for (const label of ["Actual measurements", "Projected progress", "90% forecast range", "Target", "Deadline"]) {
+    await expect(key.getByText(label, { exact: true })).toBeVisible();
+  }
+  await page.getByText("Inspect measurements", { exact: true }).press("Enter");
+  const inspector = page.getByRole("slider", { name: "Measurement 3 of 3" });
+  await expect(inspector).toHaveAttribute("aria-valuetext", /Nov 3, 2026: 30/);
+  await inspector.press("ArrowLeft");
+  await expect(page.getByRole("slider", { name: "Measurement 2 of 3" })).toHaveAttribute("aria-valuetext", /Nov 2, 2026: 20/);
+  const shareUrl = await copyShareUrl(page);
+  await page.getByLabel("New value").fill("100");
+  await page.getByRole("button", { name: "Add measurement" }).click();
+  await expect(page.getByRole("region", { name: "Summary" })).toContainText("Target reached");
+  await page.goto(shareUrl);
+  await expect(page.getByRole("region", { name: "Summary" })).toContainText("Target reached");
+  await expect(page.getByRole("button", { name: "Add measurement" })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });

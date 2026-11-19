@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { CounterForm } from "../components/CounterForm";
+import { ForecastExample } from "../components/ForecastExample";
 import { Field } from "../components/Field";
 import { RecentList } from "../components/RecentList";
 import { WithData } from "../components/WithData";
@@ -9,14 +10,17 @@ import { parseAppItemLink } from "@haakco/custd-sdk/browser";
 export function HomePage() {
   return (
     <>
-      <h1 className="hero">When will it be done?</h1>
+      <h1 className="hero home-hero">See when it will be done.</h1>
       <p className="lede">Count your progress, get an honest forecast, and share one link. No account needed.</p>
-      <section className="card card--lead" aria-labelledby="start-heading">
-        <h2 id="start-heading">Start a counter</h2>
-        <WithData>{({ data }) => <CounterForm data={data} />}</WithData>
-      </section>
+      <div className="home-start">
+        <section className="card card--lead" aria-labelledby="start-heading">
+          <h2 id="start-heading">Start a counter</h2>
+          <WithData>{({ data }) => <CounterForm data={data} />}</WithData>
+        </section>
+        <ForecastExample />
+      </div>
       <section className="section" aria-labelledby="other-heading">
-        <h2 id="other-heading">Or</h2>
+        <h2 id="other-heading">Other ways to plan</h2>
         <ul className="card-grid">
           <li className="card">
             <h3>
