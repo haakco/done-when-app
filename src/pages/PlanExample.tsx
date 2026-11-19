@@ -16,6 +16,13 @@ export default function PlanExample() {
   const [showCanvas, setShowCanvas] = useState(false);
   const [meetingStage, setMeetingStage] = useState<"ready" | "review" | "decide" | "ended">("ready");
   const forecast = preview ? example.preview : example.baseline;
+  function inspect(id: string) {
+    const detail = document.querySelector<HTMLDetailsElement>(`#example-part-${CSS.escape(id)}`);
+    if (!detail) return;
+    detail.open = true;
+    detail.querySelector("summary")?.focus();
+  }
+
   const chance = (value: number) => `${Math.round(value * 100)}%`;
   return (
     <div className="more__body">
@@ -29,11 +36,12 @@ export default function PlanExample() {
       <button type="button" className="button button--primary" onClick={() => { setPreview(!preview); }}>
         {preview ? "Reset preview" : "Preview 25 pages edited"}
       </button>
+      <p>{forecast.completedParts} of {forecast.requiredParts} required parts complete</p>
       <PlanProgress forecast={forecast} deadline={example.inputs.deadline} />
       <ul className="item-list">
         {example.inputs.parts.map((part) => (
           <li key={part.id}>
-            <details className="more">
+            <details className="more" id={`example-part-${part.id}`}>
               <summary>{part.name}</summary>
               {part.measurements ? (
                 <p>Recorded {part.measurements.map((value, index) =>
@@ -48,7 +56,7 @@ export default function PlanExample() {
       </ul>
       <details className="more" onToggle={(event) => { setShowCanvas(event.currentTarget.open); }}>
         <summary>Dependency canvas</summary>
-        {showCanvas ? <Suspense fallback={<p>Loading canvas…</p>}><PlanCanvas parts={parts} names={names} /></Suspense> : null}
+        {showCanvas ? <Suspense fallback={<p>Loading canvas…</p>}><PlanCanvas parts={parts} names={names} inspect={inspect} /></Suspense> : null}
       </details>
       <section className="section" aria-label="Example meeting">
         <h3>Launch review</h3>
@@ -56,13 +64,13 @@ export default function PlanExample() {
         {meetingStage === "ready" ? <button type="button" className="button" onClick={() => { setMeetingStage("review"); }}>Start sample meeting</button> : null}
         {meetingStage === "review" ? (
           <>
-            <p role="status">Review progress · 5 min planned</p>
+            <p role="status">Review progress · 5 min left. Up next: Decide next steps. Projected finish: 10 min after start.</p>
             <button type="button" className="button" onClick={() => { setMeetingStage("decide"); }}>Finish review after 3 min</button>
           </>
         ) : null}
         {meetingStage === "decide" ? (
           <>
-            <p role="status">Decide next steps · 5 min planned. Review finished 2 min early.</p>
+            <p role="status">Decide next steps · 5 min left. Review finished 2 min early. Projected finish: 8 min after start, 2 min ahead of the original plan.</p>
             <button type="button" className="button" onClick={() => { setMeetingStage("ended"); }}>Finish decisions after 8 min</button>
           </>
         ) : null}
@@ -71,7 +79,8 @@ export default function PlanExample() {
             <p>Planned 10 min. Took 11 min. Finished 1 min late.</p>
             <p>Review progress · 5 min planned · 3 min actual</p>
             <p>Decide next steps · 5 min planned · 8 min actual</p>
-            <p>Action · Finish editing the remaining pages.</p>
+            <p>Decision · Keep the launch date.</p>
+            <p>Action · <a href="#example-part-pages" onClick={() => { inspect("pages"); }}>Finish editing the remaining pages</a>.</p>
           </div>
         ) : null}
       </section>
