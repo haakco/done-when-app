@@ -74,9 +74,25 @@ function PlanContent({ data, access, read, live, showOwnerTools, plan }: ItemVie
             {result.deadlineProbability !== undefined && plan.deadline ? (
               <p>{Math.round(result.deadlineProbability * 100)}% chance by {dateLabel(plan.deadline)}</p>
             ) : null}
-            {result.missingParts.length ? <p>Add evidence for {result.missingParts.length} more {result.missingParts.length === 1 ? "part" : "parts"}.</p> : null}
+            {result.missingParts.length > 0 ? (
+              <details className="more">
+                <summary>{result.missingParts.length} {result.missingParts.length === 1 ? "part needs" : "parts need"} forecast evidence</summary>
+                <ul>
+                  {result.missingParts.map((id) => (
+                    <li key={id}><PlanPartName access={access} item={id} /></li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+            {result.horizonMissFraction !== undefined && result.horizonMissFraction > 0 ? (
+              <p>{Math.round(result.horizonMissFraction * 100)}% of trials did not finish by {dateLabel(result.horizon)}.</p>
+            ) : null}
             <PlanProgress forecast={result} deadline={plan.deadline} />
-            {result.requiredParts > 0 ? <p className="small muted">Assumes each part’s estimate is independent.</p> : null}
+            {result.requiredParts > 0 ? (
+              <p className="small muted">
+                Forecast as of <time dateTime={result.asOf}>{dateLabel(result.asOf)}</time>. Assumes each part’s estimate is independent.
+              </p>
+            ) : null}
           </>
         ) : null}
       </section>
