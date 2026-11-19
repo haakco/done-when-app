@@ -1,5 +1,6 @@
 //! The command line: parsing and dispatch.
 
+use std::borrow::Cow;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -41,6 +42,8 @@ pub enum Command {
     Show(ItemArg),
     /// List your items (when signed in) and the items saved on this machine.
     List,
+    /// Save an owner link from standard input for this device and its TUI.
+    Remember,
     /// Make an item yours with its owner link (sign in first).
     Claim(ItemArg),
     /// Record a dated low/high estimate on a project.
@@ -110,6 +113,7 @@ pub struct AddArgs {
 
 #[derive(Debug, Args)]
 pub struct EstimateArgs {
+    /// A saved project, link, or "-" to read a capability link from stdin.
     pub item: String,
     #[arg(long)]
     pub low: String,
@@ -193,31 +197,25 @@ pub fn dispatch(
             print(out, json, &ops::create_counter(ctx, &args.into())?)
         }
         Command::Add(args) => {
-            let mut link = String::new();
-            let item = if args.item == "-" {
-                input.read_line(&mut link).map_err(|error| {
-                    CliError::Usage(format!("read item link from stdin: {error}"))
-                })?;
-                if crate::links::parse_link(link.trim()).is_none() {
-                    return Err(CliError::Usage("expected an item link on stdin".to_owned()));
-                }
-                link.trim()
-            } else {
-                &args.item
-            };
-            let report = add(ctx, item, &args)?;
+            let item = read_write_item(&args.item, input)?;
+            let report = add(ctx, &item, &args)?;
             print(out, json, &report)?;
             report.check_outcome()
         }
         Command::Show(args) => print(out, json, &ops::show(ctx, &args.item)?),
         Command::List => print(out, json, &ops::list(ctx)?),
+        Command::Remember => print(
+            out,
+            json,
+            &ops::remember(ctx, &read_write_item("-", input)?)?,
+        ),
         Command::Claim(args) => print(out, json, &ops::claim(ctx, &args.item)?),
         Command::Estimate(args) => print(
             out,
             json,
             &ops::estimate(
                 ctx,
-                &args.item,
+                &read_write_item(&args.item, input)?,
                 &args.low,
                 &args.high,
                 args.note,
@@ -248,6 +246,21 @@ pub fn dispatch(
         Command::Tui => crate::tui::run(ctx),
         Command::Mcp => crate::mcp::serve(ctx, input, out),
     }
+}
+
+fn read_write_item<'a>(reference: &'a str, input: &mut dyn BufRead) -> CliResult<Cow<'a, str>> {
+    if reference != "-" {
+        return Ok(Cow::Borrowed(reference));
+    }
+    let mut link = String::new();
+    input
+        .read_line(&mut link)
+        .map_err(|error| CliError::Usage(format!("read item link from stdin: {error}")))?;
+    let link = link.trim();
+    if crate::links::parse_link(link).is_none() {
+        return Err(CliError::Usage("expected an item link on stdin".to_owned()));
+    }
+    Ok(Cow::Owned(link.to_owned()))
 }
 
 fn add(ctx: &Context, item: &str, args: &AddArgs) -> CliResult<ops::AddReport> {

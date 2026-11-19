@@ -810,6 +810,28 @@ pub fn list(ctx: &Context) -> CliResult<ListReport> {
     Ok(ListReport { signed_in, items })
 }
 
+/// Saves an owner's existing capability on this device without taking account ownership.
+pub fn remember(ctx: &Context, reference: &str) -> CliResult<ItemReport> {
+    let (resolved, read) = read_owned(ctx, reference)?;
+    let token = resolved
+        .token()
+        .ok_or_else(|| CliError::Usage("give an owner link".to_owned()))?;
+    let item = item_report(&read, item_kind(&read), resolved.stored.as_ref(), None);
+    let share_token = resolved
+        .stored
+        .as_ref()
+        .and_then(|stored| stored.share_token.as_deref());
+    save_item(
+        ctx,
+        &item.item_uuid,
+        item.kind,
+        &item.name,
+        Some(token),
+        share_token,
+    )?;
+    Ok(item)
+}
+
 /// Makes the signed-in user the owner of the item an owner link opens, and saves it here.
 pub fn claim(ctx: &Context, reference: &str) -> CliResult<ClaimReport> {
     if ctx.session()?.is_none() {

@@ -146,7 +146,7 @@ fn csv_import_estimate_and_dashboard() {
         &dir,
         &[
             "estimate",
-            "Km",
+            "-",
             "--low",
             "2026-12-01",
             "--high",
@@ -155,10 +155,19 @@ fn csv_import_estimate_and_dashboard() {
             "2026-11-01",
             "--json",
         ],
-        "",
+        &format!("{base}/edit/p#own-0\n"),
     );
     assert_eq!(code, 0, "{err}");
+    assert!(!out.contains("own-0"));
     let estimate: Value = serde_json::from_str(&out).unwrap();
+    let (code, out, err) = run(
+        base,
+        &dir,
+        &["remember", "--json"],
+        &format!("{base}/edit/p#own-0\n"),
+    );
+    assert_eq!(code, 0, "{err}");
+    assert!(!out.contains("own-0"));
     assert_eq!(estimate["lowDate"], "2026-12-01T00:00:00Z");
     assert_eq!(estimate["estimatedAt"], "2026-11-01T00:00:00Z");
 

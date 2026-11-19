@@ -235,7 +235,7 @@ fn render(frame: &mut Frame, view: &View) {
             frame.render_widget(Paragraph::new("Loading items…").block(heading), body);
         } else if view.items.is_empty() {
             frame.render_widget(
-                Paragraph::new("No saved items. Sign in or create a counter in the CLI.")
+                Paragraph::new("No saved items. Sign in, create a counter, or save a link with done-when remember.")
                     .block(heading)
                     .wrap(Wrap { trim: true }),
                 body,

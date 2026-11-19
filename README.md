@@ -37,7 +37,19 @@ the input file readable only by the account running the script.
 done-when add - 25 --at 2026-11-19T09:00:00Z --idempotency-key source-reading-42 --json < owner-link.txt
 ```
 
-CSV imports report each row and exit unsuccessfully if any row fails. Estimates support
-`--at`. Estimate submissions lack replay protection.
+CSV imports report each row and exit unsuccessfully if any row fails.
+
+## Write a project estimate
+
+Open the project in Done When to get its owner link. Send the link on standard input
+and give the earliest and latest delivery dates. `--at` records when the estimate was
+made. Estimate submissions lack replay protection.
+
+```sh
+done-when remember < owner-link.txt
+done-when tui
+done-when estimate - --low 2026-12-10 --high 2026-12-20 --at 2026-11-19 --json < owner-link.txt
+```
+
 
 Share links give viewers read-only access. Keep owner links and sign-in credentials private.
