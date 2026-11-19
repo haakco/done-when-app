@@ -9,6 +9,13 @@ release includes Linux and macOS builds for x86-64 and ARM64, and a Windows x86-
 with `SHA256SUMS`, extract it, and put `done-when` or `done-when.exe` on your PATH. Run `done-when --version` to
 confirm the installation.
 
+## Sign in
+
+If your hosted app offers sign-in, run `done-when --host https://your-app.example login`
+and open the URL it prints in a browser on the same machine. The app's OAuth client must
+allow `http://localhost:43159/callback`. Done When's public site currently supports saved
+items and owner links without an account.
+
 ## Work with a counter
 
 ```sh
