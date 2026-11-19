@@ -70,6 +70,9 @@ function PlanContent({ data, access, read, live, showOwnerTools, plan }: ItemVie
         {result ? (
           <>
             <p>{result.completedParts} of {result.requiredParts} required parts complete</p>
+            {result.previousMedian && result.median && dateLabel(result.previousMedian) !== dateLabel(result.median) ? (
+              <p className="small">Previous likely finish was {dateLabel(result.previousMedian)}.</p>
+            ) : null}
             {result.lower && result.upper ? <p>90% range {dateLabel(result.lower)} – {dateLabel(result.upper)}</p> : null}
             {result.deadlineProbability !== undefined && plan.deadline ? (
               <p>{Math.round(result.deadlineProbability * 100)}% chance by {dateLabel(plan.deadline)}</p>

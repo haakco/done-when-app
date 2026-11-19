@@ -186,7 +186,7 @@ export class FakeCustd {
         return json(200, {
           revision: plan.revision, asOf: caller.item.updatedAt, horizon: "2036-11-19T00:00:00Z",
           model: "independent_finish_to_start_v1", requiredParts, completedParts: 0, missingParts: [],
-          ...(requiredParts ? { median: "2026-12-05T00:00:00Z", deadlineProbability: 0.75 } : {}),
+          ...(requiredParts ? { median: "2026-12-05T00:00:00Z", previousMedian: "2026-12-08T00:00:00Z", deadlineProbability: 0.75 } : {}),
         });
       }
       case "POST /api/v1/app/item/claim":

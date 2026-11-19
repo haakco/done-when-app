@@ -27,6 +27,7 @@ test("edit plan dependencies and show the same graph to a phone viewer", async (
     const phone = await viewer.newPage();
     await phone.goto(url);
     await expect(phone.getByText("0 of 2 required parts complete")).toBeVisible();
+    await expect(phone.getByText("Previous likely finish was Dec 8, 2026.")).toBeVisible();
     await expect(phone.getByRole("button", { name: "Save plan" })).toHaveCount(0);
     await expect(phone.getByRole("region", { name: "Plan parts" }).getByText("Pages edited", { exact: true }).first()).toBeVisible();
     await phone.getByText("Dependency canvas", { exact: true }).click();
