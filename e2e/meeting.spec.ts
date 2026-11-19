@@ -1,4 +1,4 @@
-import { copyShareUrl, expect, routeToFake, test } from "./fixtures";
+import { copyShareUrl, createCounter, expect, routeToFake, test } from "./fixtures";
 import type { Page } from "@playwright/test";
 
 const MINUTE = 60_000;
@@ -90,4 +90,43 @@ test("a stale Next from a second owner tab refreshes quietly", async ({ page, co
   await other.getByRole("button", { name: "Next block: Demo" }).click();
   await expect(other.getByRole("heading", { level: 2, name: "Planning" })).toBeVisible();
   await expect(other.getByRole("alert")).toHaveCount(0);
+});
+
+test("save private minutes with an action linked to a plan part", async ({ page, browser, fake }) => {
+  await createCounter(page, "Pages edited", "20");
+  await expect(page.getByRole("heading", { name: "Pages edited", exact: true })).toBeVisible();
+  await page.goto("/new/plan");
+  await page.getByLabel("Plan name").fill("Launch the new site");
+  await page.getByRole("button", { name: "Create plan" }).click();
+  await page.getByLabel("Add recent work").selectOption({ label: "Pages edited" });
+  await page.getByRole("button", { name: "Save plan" }).click();
+  await expect(page.getByText("0 of 1 required parts complete")).toBeVisible();
+
+  await buildAgenda(page);
+  const shareUrl = await copyShareUrl(page);
+  await page.getByText("Private meeting minutes", { exact: true }).click();
+  await page.getByLabel("Minutes", { exact: true }).fill("Review the launch checklist");
+  await page.getByLabel("Decisions").fill("Publish after sign-off");
+  await page.getByLabel("Related plan").selectOption({ label: "Launch the new site" });
+  await page.getByRole("button", { name: "Add action" }).click();
+  await page.getByLabel("Description").fill("Finish the edited pages");
+  await expect(page.getByRole("option", { name: "Pages edited" })).toBeAttached();
+  await page.getByLabel("Plan part").selectOption({ label: "Pages edited" });
+  await page.getByRole("button", { name: "Save minutes" }).click();
+  await expect(page.getByText("Minutes saved.")).toBeVisible();
+  await page.reload();
+  await page.getByText("Private meeting minutes", { exact: true }).click();
+  await expect(page.getByLabel("Decisions")).toHaveValue("Publish after sign-off");
+
+  const viewer = await browser.newContext();
+  try {
+    await routeToFake(viewer, fake);
+    const display = await viewer.newPage();
+    await display.goto(`${shareUrl}?tv=1`);
+    await expect(display.getByRole("heading", { name: "Weekly sync" })).toBeVisible();
+    await expect(display.getByText("Private meeting minutes")).toHaveCount(0);
+    await expect(display.getByText("Publish after sign-off")).toHaveCount(0);
+  } finally {
+    await viewer.close();
+  }
 });

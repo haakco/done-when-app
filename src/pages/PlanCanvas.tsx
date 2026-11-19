@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { AppPlanPart } from "@haakco/custd-sdk/browser";
 import { Background, Controls, MarkerType, Position, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -7,9 +8,11 @@ type PlanCanvasProps = {
   parts: readonly AppPlanPart[];
   names: ReadonlyMap<string, string>;
   connect?: (source: string, target: string) => void;
+  inspect?: (id: string) => void;
+  labelFor?: (id: string) => ReactNode;
 };
 
-export default function PlanCanvas({ parts, names, connect }: PlanCanvasProps) {
+export default function PlanCanvas({ parts, names, connect, inspect, labelFor }: PlanCanvasProps) {
   const depths = new Map<string, number>();
   for (let pass = 0; pass < parts.length; pass++) {
     for (const part of parts) {
@@ -24,7 +27,7 @@ export default function PlanCanvas({ parts, names, connect }: PlanCanvasProps) {
     rows.set(column, row + 1);
     return {
       id: part.itemUuid,
-      data: { label: names.get(part.itemUuid) ?? `Part ${index + 1}` },
+      data: { label: names.get(part.itemUuid) ?? labelFor?.(part.itemUuid) ?? `Part ${index + 1}` },
       position: { x: column * 225, y: row * 88 },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -48,6 +51,7 @@ export default function PlanCanvas({ parts, names, connect }: PlanCanvasProps) {
         zoomOnScroll={false}
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
+        onNodeClick={(_, node) => { inspect?.(node.id); }}
         onConnect={({ source, target }) => { connect?.(source, target); }}
       >
         <Background />

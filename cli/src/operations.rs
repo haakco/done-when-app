@@ -43,6 +43,7 @@ pub const OPERATIONS: &[(&str, Coverage)] = &[
         Command("watch (measurement history)"),
     ),
     ("AppLink::plan_forecast", Command("show")),
+    ("AppLink::update_meeting_minutes", MEETING_STEP),
     (
         "AppLink::update_plan",
         Deferred("edit dependencies on the web plan page"),

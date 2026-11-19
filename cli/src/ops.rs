@@ -761,6 +761,7 @@ pub fn item_report(
     let name = project
         .map(|p| p.name.clone())
         .or_else(|| meeting.map(|m| m.name.clone()))
+        .or_else(|| read.plan.as_ref().and_then(|plan| plan.name.clone()))
         .or_else(|| stored.map(|s| s.name.clone()))
         .unwrap_or_else(|| kind.label().to_owned());
     ItemReport {

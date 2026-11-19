@@ -15,6 +15,7 @@ import { meetingWorkbook } from "../lib/exports";
 import { formatClock, formatDifference, formatLength, liveAgenda, meetingOutcome, type CurrentBlock, type LiveAgenda } from "../lib/meeting";
 import { useNow } from "../lib/use-now";
 import "../styles/meeting.css";
+import { MeetingMinutes } from "./MeetingMinutes";
 import type { ItemViewProps } from "./view-props";
 
 export function MeetingView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
@@ -43,6 +44,10 @@ export function MeetingView({ data, access, read, live, showOwnerTools, ownerRou
       {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? <Outcome meeting={meeting} /> : null}
       {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? null : <Agenda agenda={agenda} running={running} />}
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
+      {showOwnerTools ? <MeetingMinutes saved={read.meetingMinutes} revision={read.item.version} save={async (update) => {
+        await data.updateMeetingMinutes(access, update);
+        live.refresh();
+      }} /> : null}
       {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
       {showOwnerTools ? (
         <details className="more section">
@@ -114,6 +119,7 @@ function NowSummary({ meeting, current, agenda, data, access, owner, refresh }: 
       </p>
       <p className="summary__detail meeting-now__detail">
         {over ? "Over time. The blocks after this one are shrinking to fit." : `Planned ${formatLength(current.block.allocatedMs)}.`}{" "}
+        {meeting.endsAt && agenda.endsAtMs !== null && late !== 0 ? `Originally planned to end at ${formatTime(new Date(meeting.endsAt))}. ` : ""}
         {agenda.endsAtMs !== null ? `Ends ${late >= 60_000 ? `late, at ${formatTime(new Date(agenda.endsAtMs))}` : `at ${formatTime(new Date(agenda.endsAtMs))}`}.` : ""}
       </p>
       <OverrunAnnouncer title={current.block.title} over={over} />

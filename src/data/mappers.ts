@@ -183,7 +183,7 @@ export function toModel(read: AppItemRead): Model {
 
 /** The item's display name, whatever its kind. */
 export function itemNameOf(read: AppItemRead): string {
-  return read.measurementProject?.name ?? read.uncertaintyModel?.name ?? read.meeting?.name ?? (read.plan ? "Plan" : "Dashboard");
+  return read.measurementProject?.name ?? read.uncertaintyModel?.name ?? read.meeting?.name ?? (read.plan ? read.plan.name || "Plan" : "Dashboard");
 }
 
 export function modelCreateRequest(draft: ModelDraft): AppItemCreateRequest {

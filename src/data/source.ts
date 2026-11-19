@@ -15,6 +15,7 @@ import {
   type AppPlanUpdate,
   type AppItemsClient,
   type AppMeasurementBulkResponse,
+  type AppMeetingMinutesUpdate,
   type AppModelRunRequest,
   type AppModelVersionCreateRequest,
 } from "@haakco/custd-sdk/browser";
@@ -79,10 +80,12 @@ export type DoneWhenData = {
   /** Finishes `blockUuid`, the block on now; a repeat is a no-op, a stale block a 409 the caller can ignore. */
   advanceMeeting(owner: ItemAccess, blockUuid: string): Promise<void>;
   endMeeting(owner: ItemAccess): Promise<void>;
+  updateMeetingMinutes(owner: ItemAccess, update: AppMeetingMinutesUpdate): Promise<AppItemRead>;
 
+  readPlanPart(pasted: string): Promise<{ item: AppItemRead; token: string }>;
   createPlan(name: string): Promise<CreatedItem>;
   updatePlan(access: ItemAccess, update: AppPlanUpdate): Promise<AppItemRead>;
-  planForecast(access: ItemAccess): Promise<AppPlanForecast>;
+  planForecast(access: ItemAccess, item?: string): Promise<AppPlanForecast>;
 
   createDashboard(draft: DashboardDraft): Promise<CreatedItem>;
   /** One summary per dashboard item, read once for a download. */
@@ -216,12 +219,21 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
     async endMeeting(owner) {
       await items.endMeeting(owner);
     },
+    updateMeetingMinutes: (owner, update) => items.updateMeetingMinutes(owner, update),
 
+    async readPlanPart(pasted) {
+      const token = pastedToken(pasted);
+      const read = await items.readItem(token);
+      if (read.status !== "modified" || read.data.item.kind !== APP_ITEM_KINDS.measurementProject) {
+        throw new Error("Choose a counter or a project for this plan.");
+      }
+      return { item: read.data, token };
+    },
     async createPlan(name) {
       return created("plan", await items.createItem({ kind: APP_ITEM_KINDS.plan, name }));
     },
     updatePlan: (access, update) => items.updatePlan(access, update),
-    planForecast: (access) => items.planForecast(access),
+    planForecast: (access, item) => items.planForecast(access, item ? { item } : {}),
 
     async createDashboard(draft) {
       const result = await items.createItem({ kind: APP_ITEM_KINDS.linkCollection, idleExpirySeconds: draft.expiresAfterSeconds });

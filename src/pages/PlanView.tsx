@@ -1,22 +1,28 @@
-import type { AppPlan, AppPlanUpdate } from "@haakco/custd-sdk/browser";
+import { ConvergenceStory } from "@haakco/custd-react";
+import type { AppItemRead, AppPlan, AppPlanUpdate } from "@haakco/custd-sdk/browser";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { lazy, Suspense, useState } from "react";
 import { ItemHeader } from "../components/ItemHeader";
 import { WriteError } from "../components/ItemStates";
 import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
-import type { ItemAccess } from "../data";
-import { useItemRead } from "../data/live";
-import { itemNameOf, metaOf } from "../data/mappers";
+import type { DoneWhenData, ItemAccess } from "../data";
+import { projectOf, useCounter, useItemRead } from "../data/live";
+import { itemKindOf, itemNameOf, metaOf } from "../data/mappers";
 import { recentItems, savedShareToken } from "../lib/device";
 import { tokenFromPaste } from "../lib/links";
+import { formatShortDate } from "../lib/dates";
+import { LiveCounterChart } from "./CounterView";
+import { PlanProgress } from "./PlanProgress";
 import type { ItemViewProps } from "./view-props";
 
 const PlanCanvas = lazy(() => import("./PlanCanvas"));
 
-function DependencyCanvas({ parts, names, connect }: {
+function DependencyCanvas({ parts, names, connect, inspect, access }: {
   parts: AppPlan["parts"];
   names: Map<string, string>;
   connect?: (source: string, target: string) => void;
+  inspect?: (id: string) => void;
+  access?: ItemAccess;
 }) {
   const [shown, setShown] = useState(false);
   if (!parts.length) return null;
@@ -25,7 +31,7 @@ function DependencyCanvas({ parts, names, connect }: {
       <summary>Dependency canvas</summary>
       {shown ? (
         <Suspense fallback={<p role="status">Loading canvas…</p>}>
-          <PlanCanvas parts={parts} names={names} {...(connect ? { connect } : {})} />
+          <PlanCanvas parts={parts} names={names} {...(connect ? { connect } : {})} {...(inspect ? { inspect } : {})} {...(access ? { labelFor: (id) => <PlanPartName access={access} item={id} /> } : {})} />
         </Suspense>
       ) : null}
     </details>
@@ -40,6 +46,13 @@ export function PlanView(props: ItemViewProps) {
 
 function PlanContent({ data, access, read, live, showOwnerTools, plan }: ItemViewProps & { plan: AppPlan }) {
   const meta = metaOf(read);
+  const [selected, setSelected] = useState<string | null>(null);
+  function inspect(id: string) {
+    setSelected(id);
+    const detail = document.getElementById(`plan-part-${id}`);
+    detail?.scrollIntoView({ block: "nearest" });
+    detail?.querySelector("summary")?.focus();
+  }
   const forecast = useQuery({
     queryKey: ["plan-forecast", meta.itemUuid, meta.role, plan.revision],
     queryFn: () => data.planForecast(access),
@@ -62,6 +75,7 @@ function PlanContent({ data, access, read, live, showOwnerTools, plan }: ItemVie
               <p>{Math.round(result.deadlineProbability * 100)}% chance by {dateLabel(plan.deadline)}</p>
             ) : null}
             {result.missingParts.length ? <p>Add evidence for {result.missingParts.length} more {result.missingParts.length === 1 ? "part" : "parts"}.</p> : null}
+            <PlanProgress forecast={result} deadline={plan.deadline} />
             {result.requiredParts > 0 ? <p className="small muted">Assumes each part’s estimate is independent.</p> : null}
           </>
         ) : null}
@@ -72,7 +86,8 @@ function PlanContent({ data, access, read, live, showOwnerTools, plan }: ItemVie
         <ol>
           {plan.parts.map((part) => (
             <li key={part.itemUuid}>
-              <PlanPartName access={access} item={part.itemUuid} />
+              <PlanPartDetail access={access} item={part.itemUuid} open={selected === part.itemUuid}
+                onToggle={(open) => { setSelected((current) => open ? part.itemUuid : current === part.itemUuid ? null : current); }} />
               {part.required ? " · Required" : " · Optional"}
               {part.prerequisites.map((id) => (
                 <span key={id}> · After <PlanPartName access={access} item={id} /></span>
@@ -80,11 +95,11 @@ function PlanContent({ data, access, read, live, showOwnerTools, plan }: ItemVie
             </li>
           ))}
         </ol>
-        {!showOwnerTools ? <DependencyCanvas parts={plan.parts} names={names} /> : null}
+        {!showOwnerTools ? <DependencyCanvas parts={plan.parts} names={names} inspect={inspect} access={access} /> : null}
       </section>
       {showOwnerTools ? (
         <>
-          <PlanEditor key={plan.revision} plan={plan} names={names} save={async (update) => {
+          <PlanEditor key={plan.revision} plan={plan} names={names} inspect={inspect} readPart={(pasted) => data.readPlanPart(pasted)} save={async (update) => {
             await data.updatePlan(access, update);
             live.refresh();
           }} />
@@ -106,14 +121,63 @@ function PlanPartName({ access, item }: { access: ItemAccess; item: string }) {
   return <span>{read.status === "ready" ? itemNameOf(read.data) : read.status === "loading" ? "Loading part…" : "Unavailable part"}</span>;
 }
 
-function PlanEditor({ plan, names, save }: {
+function PlanPartDetail({ access, item, open, onToggle }: {
+  access: ItemAccess;
+  item: string;
+  open: boolean;
+  onToggle: (open: boolean) => void;
+}) {
+  const read = useItemRead(access, { item });
+  const value = read.status === "ready" ? read.data : null;
+  const name = value ? itemNameOf(value) : read.status === "error" ? "Unavailable part" : "Loading part…";
+  return (
+    <details className="more" id={`plan-part-${item}`} open={open} onToggle={(event) => { onToggle(event.currentTarget.open); }}>
+      <summary>{name}</summary>
+      {open && value ? <PartForecast access={access} item={item} read={value} /> : null}
+    </details>
+  );
+}
+
+function PartForecast({ access, item, read }: { access: ItemAccess; item: string; read: AppItemRead }) {
+  if (itemKindOf(read) === "counter") return <CounterPartForecast access={access} item={item} read={read} />;
+  const project = projectOf(read);
+  return (
+    <ConvergenceStory estimates={project.estimates} title={`${project.name}: estimates over time`}
+      formatDate={formatShortDate} {...(project.deliveryTarget ? { targetDate: project.deliveryTarget } : {})}
+      labels={{ empty: "The chart appears after the first estimate." }} />
+  );
+}
+
+function CounterPartForecast({ access, item, read }: { access: ItemAccess; item: string; read: AppItemRead }) {
+  const counter = useCounter(access, read, { item });
+  if (counter.status === "loading") return <p role="status">Loading measurements…</p>;
+  if (counter.status === "error") return <WriteError error={counter.error} />;
+  return <LiveCounterChart counter={counter.data} hideForecast={false} />;
+}
+
+function PlanEditor({ plan, names, inspect, readPart, save }: {
   plan: AppPlan;
   names: Map<string, string>;
+  inspect: (id: string) => void;
+  readPart: DoneWhenData["readPlanPart"];
   save: (update: AppPlanUpdate) => Promise<void>;
 }) {
   const [deadline, setDeadline] = useState(plan.deadline?.slice(0, 10) ?? "");
   const [parts, setParts] = useState<AppPlanUpdate["parts"]>(plan.parts);
+  const [pasted, setPasted] = useState("");
+  const [pastedNames, setPastedNames] = useState(new Map<string, string>());
+  const partNames = new Map([...names, ...pastedNames]);
   const update = useMutation({ mutationFn: save });
+  const addLink = useMutation({
+    mutationFn: () => readPart(pasted),
+    onSuccess: ({ item, token }) => {
+      const id = item.item.itemUuid;
+      setParts((current) => current.some((part) => part.itemUuid === id)
+        ? current : [...current, { itemUuid: id, required: true, prerequisites: [], linkToken: token }]);
+      setPastedNames((current) => new Map(current).set(id, itemNameOf(item)));
+      setPasted("");
+    },
+  });
   const candidates = recentItems().flatMap((item) => {
     if (item.kind !== "counter" && item.kind !== "project") return [];
     if (parts.some((part) => part.itemUuid === item.itemUuid)) return [];
@@ -145,10 +209,18 @@ function PlanEditor({ plan, names, save }: {
           {candidates.map((item) => <option key={item.itemUuid} value={item.itemUuid}>{item.name}</option>)}
         </select>
       </label>
-      <DependencyCanvas parts={parts} names={names} connect={connect} />
+      <label>
+        Or paste a work link
+        <input inputMode="url" value={pasted} onChange={(event) => { setPasted(event.target.value); }} />
+      </label>
+      <button type="button" className="button" disabled={addLink.isPending || !pasted.trim()} onClick={() => { addLink.mutate(); }}>
+        Add linked work
+      </button>
+      <WriteError error={addLink.error} />
+      <DependencyCanvas parts={parts} names={partNames} connect={connect} inspect={inspect} />
       {parts.map((part, index) => (
         <fieldset key={part.itemUuid}>
-          <legend>{names.get(part.itemUuid) ?? `Part ${index + 1}`}</legend>
+          <legend>{partNames.get(part.itemUuid) ?? `Part ${index + 1}`}</legend>
           <label>
             <input type="checkbox" checked={part.required} onChange={(event) => {
               setParts(parts.map((entry) => entry === part ? { ...entry, required: event.target.checked } : entry));
@@ -161,7 +233,7 @@ function PlanEditor({ plan, names, save }: {
                 const prerequisites = event.target.checked ? [...part.prerequisites, entry.itemUuid] : part.prerequisites.filter((id) => id !== entry.itemUuid);
                 setParts(parts.map((other) => other === part ? { ...part, prerequisites } : other));
               }} />
-              After {names.get(entry.itemUuid) ?? `part ${parts.indexOf(entry) + 1}`}
+              After {partNames.get(entry.itemUuid) ?? `part ${parts.indexOf(entry) + 1}`}
             </label>
           ))}
           <button type="button" className="button button--quiet" onClick={() => {

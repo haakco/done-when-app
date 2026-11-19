@@ -99,7 +99,7 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute, tv
 }
 
 /** The main chart: the forecast glides to each new position and says how far it moved. */
-function LiveCounterChart({ counter, hideForecast }: { counter: Counter; hideForecast: boolean }) {
+export function LiveCounterChart({ counter, hideForecast }: { counter: Counter; hideForecast: boolean }) {
   const { shown, moving, announcement } = useGlidingForecast(forecastDates(counter.forecast));
   return (
     <>

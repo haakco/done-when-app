@@ -1,5 +1,5 @@
 import { APP_MEETING_STATUSES, type AppItemRead } from "@haakco/custd-sdk/browser";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { DownloadMenu } from "../components/DownloadMenu";
@@ -19,6 +19,7 @@ import { dashboardWorkbook } from "../lib/exports";
 import { counterSummary, modelHeadline, projectSummary } from "../lib/forecast-text";
 import { recentItems, savedShareToken } from "../lib/device";
 import { tokenFromPaste } from "../lib/links";
+import { formatDate } from "../lib/dates";
 import { meetingLine } from "../lib/meeting";
 import { useNow } from "../lib/use-now";
 import type { ItemViewProps } from "./view-props";
@@ -88,7 +89,7 @@ function EntryCard({ data, access, entry, owner }: EntryProps) {
   else {
     name = itemNameOf(read.data);
     const kind = itemKindOf(read.data);
-    if (kind === "plan") body = <p>{read.data.plan?.parts.length ?? 0} work parts</p>;
+    if (kind === "plan") body = <PlanEntry data={data} access={access} read={read.data} />;
     else if (kind === "project") body = <ProjectEntry read={read.data} />;
     else if (kind === "model") body = <ModelEntry access={access} read={read.data} item={entry.itemUuid} />;
     else if (kind === "meeting") body = <MeetingEntry read={read.data} />;
@@ -107,6 +108,24 @@ function EntryCard({ data, access, entry, owner }: EntryProps) {
         </>
       ) : null}
     </li>
+  );
+}
+
+function PlanEntry({ data, access, read }: { data: DoneWhenData; access: ItemAccess; read: AppItemRead }) {
+  const item = read.item.itemUuid;
+  const forecast = useQuery({
+    queryKey: ["dashboard-plan-forecast", item, read.plan?.revision],
+    queryFn: () => data.planForecast(access, item),
+    refetchInterval: 30_000,
+  });
+  if (forecast.isPending) return <p className="small muted">Loading forecast…</p>;
+  if (forecast.isError) return <WriteError error={forecast.error} />;
+  const result = forecast.data;
+  return (
+    <>
+      <p className="entry__headline">{result.median ? `Likely done ${formatDate(result.median)}` : "Forecast coming soon"}</p>
+      <p className="small">{result.completedParts} of {result.requiredParts} required parts complete</p>
+    </>
   );
 }
 

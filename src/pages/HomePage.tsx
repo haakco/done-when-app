@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { CounterForm } from "../components/CounterForm";
 import { ForecastExample } from "../components/ForecastExample";
@@ -7,7 +7,10 @@ import { RecentList } from "../components/RecentList";
 import { WithData } from "../components/WithData";
 import { parseAppItemLink } from "@haakco/custd-sdk/browser";
 
+const PlanExample = lazy(() => import("./PlanExample"));
+
 export function HomePage() {
+  const [exampleOpen, setExampleOpen] = useState(false);
   return (
     <>
       <h1 className="hero home-hero">See when it will be done.</h1>
@@ -19,6 +22,10 @@ export function HomePage() {
         </section>
         <ForecastExample />
       </div>
+      <details className="more section" onToggle={(event) => { setExampleOpen(event.currentTarget.open); }}>
+        <summary>Try the launch plan</summary>
+        {exampleOpen ? <Suspense fallback={<p role="status">Loading example…</p>}><PlanExample /></Suspense> : null}
+      </details>
       <section className="section" aria-labelledby="other-heading">
         <h2 id="other-heading">Plan and manage your work</h2>
         <ul className="card-grid">

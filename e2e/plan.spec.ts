@@ -5,11 +5,13 @@ test("edit plan dependencies and show the same graph to a phone viewer", async (
   await expect(page.getByRole("heading", { name: "Pages edited", exact: true })).toBeVisible();
   await createCounter(page, "Checks passed", "10");
   await expect(page.getByRole("heading", { name: "Checks passed", exact: true })).toBeVisible();
+  const checksUrl = await copyShareUrl(page);
   await page.goto("/new/plan");
   await page.getByLabel("Plan name").fill("Launch the new site");
   await page.getByRole("button", { name: "Create plan" }).click();
   await page.getByLabel("Add recent work").selectOption({ label: "Pages edited" });
-  await page.getByLabel("Add recent work").selectOption({ label: "Checks passed" });
+  await page.getByLabel("Or paste a work link").fill(checksUrl);
+  await page.getByRole("button", { name: "Add linked work" }).click();
   await page.getByRole("group", { name: "Checks passed" }).getByLabel("After Pages edited").check();
   await page.getByRole("button", { name: "Save plan" }).click();
   await expect(page.getByText("0 of 2 required parts complete")).toBeVisible();
@@ -34,4 +36,22 @@ test("edit plan dependencies and show the same graph to a phone viewer", async (
   } finally {
     await viewer.close();
   }
+});
+
+test("the launch example previews a forecast and runs a meeting without writes", async ({ page, fake }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.getByText("Try the launch plan", { exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Launch the new site" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Likely done Dec 11, 2026" })).toBeVisible();
+  await page.getByRole("button", { name: "Preview 25 pages edited" }).click();
+  await expect(page.getByRole("heading", { name: "Likely done Dec 7, 2026" })).toBeVisible();
+  await expect(page.getByText(/Deadline chance rose from 4% to 99%/)).toBeVisible();
+  await page.getByText("Dependency canvas", { exact: true }).click();
+  await expect(page.getByRole("region", { name: "Dependency canvas" }).locator(".react-flow__edge")).toHaveCount(2);
+  await page.getByRole("button", { name: "Start sample meeting" }).click();
+  await page.getByRole("button", { name: "Finish review after 3 min" }).click();
+  await page.getByRole("button", { name: "Finish decisions after 8 min" }).click();
+  await expect(page.getByText("Planned 10 min. Took 11 min. Finished 1 min late.")).toBeVisible();
+  expect(fake.requests.filter((request) => request.method !== "GET")).toHaveLength(0);
 });

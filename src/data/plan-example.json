@@ -1,0 +1,248 @@
+{
+  "version": 1,
+  "inputs": {
+    "asOf": "2026-12-01T00:00:00Z",
+    "deadline": "2026-12-11T00:00:00Z",
+    "trials": 512,
+    "parts": [
+      {
+        "id": "pages",
+        "name": "Pages edited",
+        "unit": "pages",
+        "measurements": [
+          3,
+          8,
+          13,
+          17
+        ],
+        "previewValue": 25,
+        "target": 60,
+        "seed": 170
+      },
+      {
+        "id": "checks",
+        "name": "Checks passed",
+        "unit": "checks",
+        "measurements": [
+          0,
+          4,
+          7,
+          10
+        ],
+        "target": 24,
+        "seed": 171
+      },
+      {
+        "id": "sign-off",
+        "name": "Launch sign-off",
+        "durationDays": [
+          1,
+          2
+        ],
+        "prerequisites": [
+          "pages",
+          "checks"
+        ],
+        "seed": 172
+      }
+    ]
+  },
+  "baseline": {
+    "revision": 1,
+    "asOf": "2026-12-01T00:00:00Z",
+    "horizon": "2026-12-31T00:00:00Z",
+    "deadlineProbability": 0.044921875,
+    "requiredParts": 3,
+    "completedParts": 0,
+    "missingParts": [],
+    "model": "independent_finish_to_start_v1",
+    "median": "2026-12-11T15:51:05.107362651Z",
+    "lower": "2026-12-11T00:31:49.529582781Z",
+    "upper": "2026-12-12T10:34:53.651822876Z",
+    "projectedProgress": [
+      {
+        "at": "2026-12-01T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 0
+      },
+      {
+        "at": "2026-12-02T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 0
+      },
+      {
+        "at": "2026-12-03T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 0
+      },
+      {
+        "at": "2026-12-04T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 0
+      },
+      {
+        "at": "2026-12-05T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 1
+      },
+      {
+        "at": "2026-12-06T00:00:00Z",
+        "lower": 1,
+        "median": 1,
+        "upper": 1
+      },
+      {
+        "at": "2026-12-07T00:00:00Z",
+        "lower": 1,
+        "median": 1,
+        "upper": 1
+      },
+      {
+        "at": "2026-12-09T00:00:00Z",
+        "lower": 1,
+        "median": 1,
+        "upper": 1
+      },
+      {
+        "at": "2026-12-11T00:00:00Z",
+        "lower": 2,
+        "median": 2,
+        "upper": 2
+      },
+      {
+        "at": "2026-12-14T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-18T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-23T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-30T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-31T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      }
+    ]
+  },
+  "preview": {
+    "revision": 1,
+    "asOf": "2026-12-01T00:00:00Z",
+    "horizon": "2026-12-31T00:00:00Z",
+    "deadlineProbability": 0.986328125,
+    "requiredParts": 3,
+    "completedParts": 0,
+    "missingParts": [],
+    "model": "independent_finish_to_start_v1",
+    "median": "2026-12-07T11:16:57.763365155Z",
+    "lower": "2026-12-06T14:03:44.067883642Z",
+    "upper": "2026-12-09T12:42:58.142434253Z",
+    "projectedProgress": [
+      {
+        "at": "2026-12-01T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 0
+      },
+      {
+        "at": "2026-12-02T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 0
+      },
+      {
+        "at": "2026-12-03T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 0
+      },
+      {
+        "at": "2026-12-04T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 0
+      },
+      {
+        "at": "2026-12-05T00:00:00Z",
+        "lower": 0,
+        "median": 0,
+        "upper": 1
+      },
+      {
+        "at": "2026-12-06T00:00:00Z",
+        "lower": 1,
+        "median": 2,
+        "upper": 2
+      },
+      {
+        "at": "2026-12-07T00:00:00Z",
+        "lower": 1,
+        "median": 2,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-09T00:00:00Z",
+        "lower": 2,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-11T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-14T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-18T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-23T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-30T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      },
+      {
+        "at": "2026-12-31T00:00:00Z",
+        "lower": 3,
+        "median": 3,
+        "upper": 3
+      }
+    ]
+  }
+}

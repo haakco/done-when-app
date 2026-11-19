@@ -2,6 +2,7 @@
 // needs every item at once, so it reads each one here instead.
 
 import { APP_ITEM_ERROR_CODES, APP_MODEL_ERROR_CODES, APP_MODEL_QUANTITY_KINDS, AppItemError, type AppConditionalRead, type AppItemAccess, type AppItemsClient } from "@haakco/custd-sdk/browser";
+import { formatDate } from "../lib/dates";
 import type { DashboardRow } from "../lib/exports";
 import { counterSummary, modelHeadline, projectSummary } from "../lib/forecast-text";
 import { meetingLine } from "../lib/meeting";
@@ -30,8 +31,12 @@ export async function dashboardRow(items: AppItemsClient, access: AppItemAccess,
     const updatedAt = new Date(read.item.updatedAt);
     const kind = itemKindOf(read);
     if (kind === "plan") {
-      const count = read.plan?.parts.length ?? 0;
-      return { name: "Plan", kind, status: "", headline: `${count} work parts`, detail: "", updatedAt };
+      const forecast = await items.planForecast(access, options);
+      return {
+        name: read.plan?.name || "Plan", kind, status: "",
+        headline: forecast.median ? `Likely done ${formatDate(forecast.median)}` : "Forecast coming soon",
+        detail: `${forecast.completedParts} of ${forecast.requiredParts} required parts complete`, updatedAt,
+      };
     }
     if (kind === "project") {
       const project = toProject(read);

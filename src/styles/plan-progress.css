@@ -1,0 +1,46 @@
+.plan-progress {
+  margin: 1rem 0 0;
+}
+
+.plan-progress svg {
+  display: block;
+  width: 100%;
+}
+
+.plan-progress svg text {
+  fill: var(--color-ink-muted);
+  font-size: 12px;
+}
+
+.plan-progress__axis,
+.plan-progress__actual,
+.plan-progress__projection {
+  fill: none;
+}
+
+.plan-progress__axis {
+  stroke: var(--color-line);
+}
+
+.plan-progress__actual,
+.plan-progress__projection {
+  stroke-width: 3;
+}
+
+.plan-progress__actual {
+  stroke: var(--color-ink);
+}
+
+.plan-progress__projection {
+  stroke: var(--color-forecast);
+  stroke-dasharray: 6 4;
+}
+
+.plan-progress__band {
+  fill: var(--color-forecast-soft);
+}
+
+.plan-progress__deadline {
+  stroke: var(--color-finish);
+  stroke-dasharray: 2 3;
+}

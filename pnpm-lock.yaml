@@ -167,11 +167,11 @@ importers:
   .:
     dependencies:
       '@haakco/custd-react':
-        specifier: github:haakco/custd-sdk#v3.61.0&path:/sdk-react
-        version: https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-react(@haakco/custd-sdk@https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-js)(@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)
+        specifier: github:haakco/custd-sdk#v3.62.0&path:/sdk-react
+        version: https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-react(@haakco/custd-sdk@https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-js)(@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)
       '@haakco/custd-sdk':
-        specifier: github:haakco/custd-sdk#v3.61.0&path:/sdk-js
-        version: https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-js
+        specifier: github:haakco/custd-sdk#v3.62.0&path:/sdk-js
+        version: https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-js
       '@tanstack/react-query':
         specifier: ^5.107.1
         version: 5.107.1(@types/react@19.3.0)(react@19.3.1)
@@ -372,18 +372,18 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@haakco/custd-react@https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-react':
-    resolution: {gitHosted: true, integrity: sha512-P1W5bPqdj5qafS4e05huVNBN5rimBX7F8EXTeTcfNMopB60KWGTe6hy058jesmETS9j7WVMo7PqkHIEhCMy5xg==, path: /sdk-react, tarball: https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8}
-    version: 3.61.0
+  '@haakco/custd-react@https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-react':
+    resolution: {gitHosted: true, integrity: sha512-pjE9rddIJL0Yotv/MxxwuY3ZqozXXUA+H31K1+gDsPWpzSjlp6PPxTHvK8ZqtCXaegV/CAegAfANNVBkVfvMCw==, path: /sdk-react, tarball: https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d}
+    version: 3.62.0
     engines: {node: '>=24 <27'}
     peerDependencies:
       '@haakco/custd-sdk': '>=3.54.0 <4'
       '@tanstack/react-query': '>=5 <6'
       react: '>=18 <20'
 
-  '@haakco/custd-sdk@https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-js':
-    resolution: {gitHosted: true, integrity: sha512-P1W5bPqdj5qafS4e05huVNBN5rimBX7F8EXTeTcfNMopB60KWGTe6hy058jesmETS9j7WVMo7PqkHIEhCMy5xg==, path: /sdk-js, tarball: https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8}
-    version: 3.61.0
+  '@haakco/custd-sdk@https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-js':
+    resolution: {gitHosted: true, integrity: sha512-pjE9rddIJL0Yotv/MxxwuY3ZqozXXUA+H31K1+gDsPWpzSjlp6PPxTHvK8ZqtCXaegV/CAegAfANNVBkVfvMCw==, path: /sdk-js, tarball: https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d}
+    version: 3.62.0
     engines: {node: '>=24 <27'}
 
   '@humanfs/core@0.19.2':
@@ -2236,13 +2236,13 @@ snapshots:
 
   '@exodus/bytes@1.16.0': {}
 
-  '@haakco/custd-react@https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-react(@haakco/custd-sdk@https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-js)(@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)':
+  '@haakco/custd-react@https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-react(@haakco/custd-sdk@https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-js)(@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)':
     dependencies:
-      '@haakco/custd-sdk': https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-js
+      '@haakco/custd-sdk': https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-js
       '@tanstack/react-query': 5.107.1(@types/react@19.3.0)(react@19.3.1)
       react: 19.3.1
 
-  '@haakco/custd-sdk@https://codeload.github.com/haakco/custd-sdk/tar.gz/705de4de741519906871986eb5d902dc2918fef8#path:/sdk-js': {}
+  '@haakco/custd-sdk@https://codeload.github.com/haakco/custd-sdk/tar.gz/5974d66a74b477f9bdf98f44f6806f9a4d8b095d#path:/sdk-js': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

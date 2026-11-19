@@ -25,7 +25,7 @@ import type {
   AppProjectEstimateList,
   HostedAppDiscovery,
 } from "@haakco/custd-sdk/browser";
-import type { AppPlan, AppPlanUpdate } from "@haakco/custd-sdk/browser";
+import type { AppMeetingMinutes, AppMeetingMinutesUpdate, AppPlan, AppPlanUpdate } from "@haakco/custd-sdk/browser";
 import type { AppAlertDelivery, AppAlertRule, AppAlertRuleSpec, AppAlertSettings, AppAlertWebhook } from "@haakco/custd-sdk/browser";
 
 export type FakeRequest = { method: string; url: string; headers: Record<string, string>; body: string | null };
@@ -50,6 +50,7 @@ type Stored = {
   ownerUser: string | null;
   project?: AppMeasurementProject;
   plan?: AppPlan;
+  meetingMinutes?: AppMeetingMinutes;
   model?: AppUncertaintyModel;
   meeting?: AppMeeting & { lastFinished: string | null };
   modelRuns: AppModelRun[];
@@ -174,6 +175,8 @@ export class FakeCustd {
         return this.conditional(request, `"${caller.item.version}"`, () => this.read(caller));
       case "PATCH /api/v1/app/item":
         return json(200, this.change(caller, () => { this.settings(caller.item, body); }));
+      case "PATCH /api/v1/app/item/meeting/minutes":
+        return json(200, this.change(caller, () => { this.updateMeetingMinutes(caller.item, body as AppMeetingMinutesUpdate); }));
       case "PATCH /api/v1/app/item/plan":
         return json(200, this.change(caller, () => { this.updatePlan(caller.item, body as AppPlanUpdate); }));
       case "GET /api/v1/app/item/plan/forecast": {
@@ -321,7 +324,7 @@ export class FakeCustd {
       modelRuns: [],
       alerts: { rules: [], webhooks: [], subscribers: new Set(), deliveries: [] },
     };
-    if (request.kind === "plan") item.plan = { revision: 1, parts: [] };
+    if (request.kind === "plan") item.plan = { revision: 1, parts: [], ...(request.name ? { name: request.name } : {}) };
     if (request.kind === "uncertainty_model") {
       const create = request.uncertaintyModel;
       item.model = { modelUuid: crypto.randomUUID(), name: create.name, description: create.description ?? "", latestVersion: 0, createdAt: now, updatedAt: now };
@@ -372,6 +375,24 @@ export class FakeCustd {
     return { link: { linkUuid: link?.linkUuid ?? "", role: old.role, createdAt: link?.createdAt ?? "" }, token };
   }
 
+  private updateMeetingMinutes(item: Stored, request: AppMeetingMinutesUpdate): void {
+    if (!item.meeting || request.expectedRevision !== item.version) throw new Problem(409, "app_plan_revision_conflict");
+    if (request.planUuid) {
+      const link = request.planLinkToken ? this.links.get(request.planLinkToken) : null;
+      const plan = this.items.get(request.planUuid)?.plan;
+      if (!plan || (link?.itemUuid !== request.planUuid && item.meetingMinutes?.planUuid !== request.planUuid)) {
+        throw new Problem(404, "app_item_not_found");
+      }
+      for (const action of request.actions) {
+        if (action.partUuid && !plan.parts.some((part) => part.itemUuid === action.partUuid)) {
+          throw new Problem(404, "app_item_not_found");
+        }
+      }
+    }
+    const { minutes, decisions, actions, planUuid } = request;
+    item.meetingMinutes = { minutes, decisions, actions, ...(planUuid ? { planUuid } : {}) };
+  }
+
   private updatePlan(item: Stored, request: AppPlanUpdate): void {
     if (!item.plan || request.expectedRevision !== item.plan.revision) {
       throw new Problem(409, "app_plan_revision_conflict");
@@ -382,7 +403,7 @@ export class FakeCustd {
       if (!existing.has(itemUuid) && link?.itemUuid !== itemUuid) throw new Problem(404, "app_item_not_found");
       return { itemUuid, required, prerequisites };
     });
-    item.plan = { revision: item.version + 1, parts, ...(request.deadline ? { deadline: request.deadline } : {}) };
+    item.plan = { revision: item.version + 1, parts, ...(item.plan.name ? { name: item.plan.name } : {}), ...(request.deadline ? { deadline: request.deadline } : {}) };
   }
 
   private read(caller: Caller): AppItemRead {
@@ -401,6 +422,7 @@ export class FakeCustd {
       },
     };
     if (caller.role === "owner") {
+      if (item.meetingMinutes) read.meetingMinutes = structuredClone(item.meetingMinutes);
       read.links = [...this.links.values()]
         .filter((link) => link.itemUuid === item.uuid)
         .map(({ linkUuid, role, createdAt }) => ({ linkUuid, role, createdAt }));
