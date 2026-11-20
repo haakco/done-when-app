@@ -12,8 +12,10 @@ export type DoneWhenState =
   | { status: "unavailable" }
   | { status: "ready"; data: DoneWhenData; signIn: BrowserSignIn | null; app: HostedApp };
 
+const CUSTOM_EVENT = "custom-event";
+
 function dataFor(app: HostedApp): DoneWhenData | null {
-  return app.appItems ? createDoneWhenData(app.appItems) : null;
+  return app.appItems ? createDoneWhenData(app.appItems, (event) => { void app.trackAppEvent(CUSTOM_EVENT, { name: event }); }) : null;
 }
 
 /** The app's data, once the hosted app has read its discovery file. */

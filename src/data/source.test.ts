@@ -2,7 +2,7 @@ import { AppItemsClient } from "@haakco/custd-sdk/browser";
 import { describe, expect, it } from "vitest";
 import { FakeCustd, type FakeCustdOptions } from "../../e2e/fake-custd";
 import { toCounter } from "./mappers";
-import { createDoneWhenData, explainError } from "./source";
+import { createDoneWhenData, explainError, MODEL_EVENTS } from "./source";
 
 const ORIGIN = "http://127.0.0.1:4173";
 const FORECAST = { method: "bayesian_linear_regression", forecastFrom: null } as const;
@@ -30,6 +30,20 @@ async function counterRead(items: AppItemsClient, token: string) {
 const DRAFT = { name: "Pages", unit: "pages", startValue: 0, targetValue: 100, startedAt: "2026-11-01T00:00:00Z", deadline: null, history: [], expiresAfterSeconds: 604800 };
 
 describe("Done When data over the Custd SDK", () => {
+  it("tracks model actions without including the model or link in the event", async () => {
+    const { items } = setUp();
+    const events: string[] = [];
+    const data = createDoneWhenData(items, (event) => { events.push(event); });
+    const created = await data.createModel({
+      name: "Private estimate", description: "", expiresAfterSeconds: 604800,
+      quantities: [{ name: "estimate", kind: "input", input: { shape: "point", value: 10 } }],
+    });
+    await expect(data.runModel(created.shareToken, {})).rejects.toThrow();
+    await data.runModel(created.ownerToken, {});
+    data.trackModelShared();
+    expect(events).toEqual([MODEL_EVENTS.created, MODEL_EVENTS.run, MODEL_EVENTS.shared]);
+  });
+
   it("creates a counter from CSV history and forecasts it at once", async () => {
     const { data, items } = setUp();
     const history = [10, 20, 30].map((value, day) => ({ measuredAt: `2026-11-0${day + 1}T00:00:00Z`, value }));

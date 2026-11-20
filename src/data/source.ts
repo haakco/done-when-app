@@ -42,6 +42,14 @@ import type {
   ProjectDraft,
 } from "./types";
 
+export const MODEL_EVENTS = {
+  created: "model-created",
+  run: "model-run",
+  shared: "model-shared",
+} as const;
+
+type ModelEvent = (typeof MODEL_EVENTS)[keyof typeof MODEL_EVENTS];
+
 /** A forecast needs this many measurements. */
 export const FORECAST_MIN_MEASUREMENTS = 3;
 /** Custd takes at most this many measurements per request. */
@@ -72,6 +80,7 @@ export type DoneWhenData = {
   completeProject(owner: ItemAccess, completedAt: string): Promise<void>;
   cancelProject(owner: ItemAccess): Promise<void>;
 
+  trackModelShared(): void;
   createModel(draft: ModelDraft): Promise<CreatedItem>;
   readCounterForecastSource(pasted: string): Promise<CounterForecastSource>;
   copyModel(owner: ItemAccess): Promise<CreatedItem>;
@@ -113,7 +122,7 @@ export type DoneWhenData = {
   unsubscribeEmail(owner: ItemAccess): Promise<void>;
 };
 
-export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
+export function createDoneWhenData(items: AppItemsClient, trackModel?: (event: ModelEvent) => void): DoneWhenData {
   const created = (kind: CreatedItem["kind"], result: { item: AppItemRead; ownerToken: string; shareToken: string }): CreatedItem => {
     rememberShareToken(result.item.item.itemUuid, result.shareToken);
     return { kind, itemUuid: result.item.item.itemUuid, ownerToken: result.ownerToken, shareToken: result.shareToken };
@@ -201,8 +210,13 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
       await items.cancel(owner);
     },
 
+    trackModelShared() {
+      trackModel?.(MODEL_EVENTS.shared);
+    },
     async createModel(draft) {
-      return created("model", await items.createItem(modelCreateRequest(draft)));
+      const result = created("model", await items.createItem(modelCreateRequest(draft)));
+      trackModel?.(MODEL_EVENTS.created);
+      return result;
     },
     async readCounterForecastSource(pasted) {
       const token = pastedToken(pasted);
@@ -213,13 +227,16 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
       return { projectUuid: read.data.measurementProject.projectUuid, token };
     },
     async copyModel(owner) {
-      return created("model", await items.copyModel(owner));
+      const result = created("model", await items.copyModel(owner));
+      trackModel?.(MODEL_EVENTS.created);
+      return result;
     },
     async saveModelVersion(owner, request) {
       await items.addModelVersion(owner, request);
     },
     async runModel(owner, request) {
       await items.runModel(owner, { ...request, seed: Math.floor(Math.random() * 2 ** 31) });
+      trackModel?.(MODEL_EVENTS.run);
     },
 
     async createMeeting(draft) {

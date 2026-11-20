@@ -57,6 +57,7 @@ function ShareButton({ data, access, kind, meta, owner }: ShareProps) {
   const token = owner ? saved : typeof access === "string" ? access : null;
   const copy = async (shareToken: string) => {
     const result = await copyText(absoluteUrl(sharePath(kind, shareToken)), navigator.clipboard);
+    if (kind === "model" && result.status === "copied") data.trackModelShared();
     setStatus(result.status === "copied" ? "View-only link copied." : "Could not copy. Open “Links” below to copy it yourself.");
   };
   if (!token && !(owner && shareLink)) return null;
