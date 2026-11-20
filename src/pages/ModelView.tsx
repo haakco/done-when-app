@@ -1,8 +1,9 @@
 import { MeasureNextPanel, ModelCalculator, ModelEditor, QuantityHistogram, SensitivityView } from "@haakco/custd-react";
-import { APP_MODEL_FORECAST_FIELDS, APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, APP_MODEL_SOURCE_KINDS, modelRunSummaryCsv, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
+import { APP_LINK_ROLES, APP_MODEL_FORECAST_FIELDS, APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, APP_MODEL_SOURCE_KINDS, modelRunSummaryCsv, type AppItemRead, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useNavigate } from "react-router";
+import { CopyButton } from "../components/CopyButton";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { ImportPanel } from "../components/ImportPanel";
 import { ItemHeader } from "../components/ItemHeader";
@@ -13,7 +14,7 @@ import type { DoneWhenData, ItemAccess, Model } from "../data";
 import { modelOf, useModelRun } from "../data/live";
 import { formatDate } from "../lib/dates";
 import { modelWorkbook } from "../lib/exports";
-import { ownerPath } from "../lib/links";
+import { absoluteUrl, ownerPath, sharePath } from "../lib/links";
 import { mergeQuantities, parseQuantityTable } from "../lib/imports";
 import type { Table } from "../lib/table";
 import type { ItemViewProps } from "./view-props";
@@ -48,11 +49,16 @@ export function ModelView({ data, access, read, live, showOwnerTools, ownerRoute
         title={model.name}
         owner={showOwnerTools}
         actions={(
-          <DownloadMenu
-            name={model.name}
-            build={() => modelWorkbook(model, result?.versionNumber === model.latestVersion ? result : null, new Date())}
-            {...(result ? { runSummaryCsv: () => modelRunSummaryCsv(result, result.versionNumber === model.latestVersion ? model.version?.quantities : []) } : {})}
-          />
+          <>
+            {read.item.role === APP_LINK_ROLES.share && typeof access === "string" ? (
+              <CopyButton label="Copy embed link" text={absoluteUrl(`/embed/model/${encodeURIComponent(access)}`)} showText={false} />
+            ) : null}
+            <DownloadMenu
+              name={model.name}
+              build={() => modelWorkbook(model, result?.versionNumber === model.latestVersion ? result : null, new Date())}
+              {...(result ? { runSummaryCsv: () => modelRunSummaryCsv(result, result.versionNumber === model.latestVersion ? model.version?.quantities : []) } : {})}
+            />
+          </>
         )}
       >
         <span className="small muted">{model.latestVersion > 0 ? `Version ${model.latestVersion}` : "No quantities yet"}</span>
@@ -86,6 +92,20 @@ export function ModelView({ data, access, read, live, showOwnerTools, ownerRoute
       {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
       {showOwnerTools ? <ModelOwnerTools data={data} access={access} model={model} /> : null}
     </article>
+  );
+}
+
+export function ModelEmbed({ access, read }: { access: string; read: AppItemRead }) {
+  const model = modelOf(read);
+  const run = useModelRun(access);
+  return (
+    <main className="section" aria-labelledby="item-name">
+      <h1 id="item-name">{model.name}</h1>
+      {run.status === "loading" ? <Loading what="results" /> : null}
+      {run.status === "error" ? <WriteError error={run.error} /> : null}
+      {run.status === "ready" ? <ModelResults model={model} run={run.data} outputs={modelOutputs(model)} /> : null}
+      <a href={sharePath("model", access)} target="_blank" rel="noreferrer">Open in Done When</a>
+    </main>
   );
 }
 

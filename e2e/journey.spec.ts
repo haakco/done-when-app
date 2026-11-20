@@ -194,6 +194,15 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
     const csv = await readFile(await summary.path(), "utf8");
     expect(csv).toContain("quantity,unit,mean,std_dev,p5,p25,p50,p75,p95,error");
     expect(csv).toContain("total,,22.5,");
+    await viewerPage.getByRole("button", { name: "Copy embed link" }).click();
+    await expect(viewerPage.getByText("Copied.", { exact: true })).toBeVisible();
+    const embedUrl = await viewerPage.evaluate(() => navigator.clipboard.readText());
+    expect(new URL(embedUrl).pathname).toMatch(/^\/embed\/model\//);
+    await viewerPage.goto(embedUrl);
+    await expect(viewerPage.getByRole("main").getByRole("heading", { name: "Monthly cost", exact: true })).toBeVisible();
+    await expect(viewerPage.getByText("total: about 22.5")).toBeVisible();
+    await expect(viewerPage.getByRole("navigation")).toHaveCount(0);
+    await expect(viewerPage.getByRole("button", { name: "Run model" })).toHaveCount(0);
   } finally {
     await viewer.close();
   }

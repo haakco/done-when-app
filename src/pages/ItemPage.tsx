@@ -1,4 +1,4 @@
-import { APP_ITEM_ERROR_CODES, APP_LINK_ROLES, AppItemError } from "@haakco/custd-sdk/browser";
+import { APP_ITEM_ERROR_CODES, APP_ITEM_KINDS, APP_LINK_ROLES, AppItemError } from "@haakco/custd-sdk/browser";
 import { useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { ItemFailed, Loading } from "../components/ItemStates";
@@ -12,7 +12,7 @@ import { useTvMode } from "../lib/use-motion";
 import { CounterView } from "./CounterView";
 import { DashboardView } from "./DashboardView";
 import { MeetingView } from "./MeetingView";
-import { ModelView } from "./ModelView";
+import { ModelEmbed, ModelView } from "./ModelView";
 import { PlanView } from "./PlanView";
 import { ProjectView } from "./ProjectView";
 
@@ -20,6 +20,21 @@ import { ProjectView } from "./ProjectView";
 export function SharePage() {
   const { token = "" } = useParams();
   return <WithData>{({ data }) => <ItemPage data={data} access={token} route="share" />}</WithData>;
+}
+
+export function ModelEmbedPage() {
+  const { token = "" } = useParams();
+  return <WithData>{() => <ModelEmbedRead token={token} />}</WithData>;
+}
+
+function ModelEmbedRead({ token }: { token: string }) {
+  const read = useItemRead(token);
+  if (read.status === "loading") return <Loading what="model" />;
+  if (read.status === "error") return <ItemFailed error={read.error} what="model" />;
+  if (read.data.item.kind !== APP_ITEM_KINDS.uncertaintyModel || read.data.item.role !== APP_LINK_ROLES.share) {
+    return <ItemFailed error={new AppItemError(404, APP_ITEM_ERROR_CODES.notFound)} what="model" />;
+  }
+  return <ModelEmbed access={token} read={read.data} />;
 }
 
 /** `/edit/<kind>#<owner token>`: the token stays in the fragment, so no server or page view sees it. */

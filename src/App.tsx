@@ -4,7 +4,7 @@ import { Layout } from "./components/Layout";
 import { ApiPage } from "./pages/ApiPage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { HomePage } from "./pages/HomePage";
-import { OwnerPage, SharePage } from "./pages/ItemPage";
+import { ModelEmbedPage, OwnerPage, SharePage } from "./pages/ItemPage";
 import { MyItemsPage } from "./pages/MyItemsPage";
 import { NewCounterPage } from "./pages/NewCounterPage";
 import { NewDashboardPage } from "./pages/NewDashboardPage";
@@ -17,6 +17,7 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 export function App() {
   return (
     <Routes>
+      <Route path="embed/model/:token" element={<ModelEmbedPage />} />
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="new/counter" element={<NewCounterPage />} />

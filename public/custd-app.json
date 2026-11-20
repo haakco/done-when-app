@@ -23,6 +23,10 @@
       "file": "index.html"
     },
     {
+      "prefix": "/embed/model/",
+      "file": "index.html"
+    },
+    {
       "prefix": "/m/",
       "file": "index.html"
     },
@@ -49,8 +53,24 @@
   ],
   "headers": [
     {
+      "route": "/embed/model/*",
+      "framing": "any",
+      "headers": [
+        { "name": "Referrer-Policy", "value": "no-referrer" },
+        { "name": "X-Robots-Tag", "value": "noindex" }
+      ]
+    },
+    {
       "route": "/edit/**",
       "headers": [
+    {
+      "route": "/embed/model/*",
+      "framing": "any",
+      "headers": [
+        { "name": "Referrer-Policy", "value": "no-referrer" },
+        { "name": "X-Robots-Tag", "value": "noindex" }
+      ]
+    },
         {
           "name": "Referrer-Policy",
           "value": "no-referrer"
