@@ -101,7 +101,7 @@ pub struct Tool {
     schema: fn() -> Value,
 }
 
-pub const TOOLS: [Tool; 4] = [
+pub const TOOLS: [Tool; 6] = [
     Tool {
         name: "create_counter",
         title: "Create a counter",
@@ -141,6 +141,30 @@ pub const TOOLS: [Tool; 4] = [
         title: "Read the forecast",
         description: "Read an item and its kind; for a counter, its status, completion interval and chance of meeting its deadline.",
         side_effect: SideEffect::ReadOnly,
+        schema: || {
+            object(
+                json!({ "item": { "type": "string", "description": ITEM_DESCRIPTION } }),
+                &["item"],
+            )
+        },
+    },
+    Tool {
+        name: "read_model_run",
+        title: "Read model results",
+        description: "Read the latest stored model run, including percentiles and histograms.",
+        side_effect: SideEffect::ReadOnly,
+        schema: || {
+            object(
+                json!({ "item": { "type": "string", "description": ITEM_DESCRIPTION } }),
+                &["item"],
+            )
+        },
+    },
+    Tool {
+        name: "run_model",
+        title: "Run a model",
+        description: "Run the latest saved model version and store its results. Requires owner access.",
+        side_effect: SideEffect::Additive,
         schema: || {
             object(
                 json!({ "item": { "type": "string", "description": ITEM_DESCRIPTION } }),
@@ -214,6 +238,8 @@ fn call_tool(ctx: &Context, params: &Value) -> Result<Value, String> {
             )
         }
         "read_forecast" => as_json(ops::show(ctx, &text_arg(&args, "item")?)),
+        "read_model_run" => as_json(ops::show_model_run(ctx, &text_arg(&args, "item")?)),
+        "run_model" => as_json(ops::run_model(ctx, &text_arg(&args, "item")?, None)),
         "list_items" => as_json(ops::list(ctx)),
         _ => return Err(format!("unknown tool {name:?}")),
     };

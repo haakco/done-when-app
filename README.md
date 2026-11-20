@@ -39,6 +39,19 @@ done-when add - 25 --at 2026-11-19T09:00:00Z --idempotency-key source-reading-42
 
 CSV imports report each row and exit unsuccessfully if any row fails.
 
+## Run or inspect a model
+
+Open an existing model in Done When. Run it from a saved item name or pass its owner link
+on standard input. A share link can read the latest saved results.
+
+```sh
+done-when model run - --seed 7 < owner-link.txt
+done-when model show - --json < share-link.txt
+```
+
+The terminal browser shows histograms for saved models. The MCP server exposes
+`run_model` for owners and `read_model_run` for owners and viewers.
+
 ## Write a project estimate
 
 Open the project in Done When to get its owner link. Send the link on standard input

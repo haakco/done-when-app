@@ -12,6 +12,31 @@ pub trait Report: Serialize {
     fn text(&self) -> String;
 }
 
+impl Report for custd_sdk::AppModelRun {
+    fn text(&self) -> String {
+        let mut lines = vec![format!(
+            "Model version {} · {} trials",
+            self.version_number, self.sample_count
+        )];
+        lines.extend(self.quantities.iter().map(|quantity| {
+            if let Some(summary) = &quantity.summary {
+                let p = &summary.percentiles;
+                format!(
+                    "{}: {:.3} (90%: {:.3} to {:.3})",
+                    quantity.name, p.p50, p.p5, p.p95
+                )
+            } else {
+                let detail = quantity
+                    .error
+                    .as_ref()
+                    .map_or("no result", |error| error.detail.as_str());
+                format!("{}: {detail}", quantity.name)
+            }
+        }));
+        lines.join("\n")
+    }
+}
+
 impl Report for CreatedReport {
     fn text(&self) -> String {
         let mut text = format!(

@@ -43,6 +43,11 @@ pub const OPERATIONS: &[(&str, Coverage)] = &[
         Command("watch (measurement history)"),
     ),
     ("AppLink::plan_forecast", Command("show")),
+    ("AppLink::run_model", Command("model run, mcp run_model")),
+    (
+        "AppLink::latest_model_run",
+        Command("model show, mcp read_model_run, TUI model details"),
+    ),
     ("AppLink::update_meeting_minutes", MEETING_STEP),
     (
         "AppLink::update_plan",

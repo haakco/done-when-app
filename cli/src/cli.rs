@@ -55,12 +55,27 @@ pub enum Command {
     /// Make and edit dashboards.
     #[command(subcommand)]
     Dashboard(DashboardCommand),
+    /// Run a model or read its stored results.
+    #[command(subcommand)]
+    Model(ModelCommand),
     /// Open a live view of a counter's forecast.
     Watch(WatchArgs),
     /// Browse and update counters and projects in the terminal.
     Tui,
     /// Run a stdio MCP server for AI agents.
     Mcp,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ModelCommand {
+    /// Show the latest stored model run.
+    Show(ItemArg),
+    /// Store a run. Use a saved item name or pass the owner link on stdin with `-`.
+    Run {
+        item: String,
+        #[arg(long)]
+        seed: Option<i64>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -236,6 +251,14 @@ pub fn dispatch(
         }
         Command::Dashboard(DashboardCommand::Remove { dashboard, entry }) => {
             print(out, json, &ops::dashboard_remove(ctx, &dashboard, &entry)?)
+        }
+        Command::Model(ModelCommand::Show(args)) => {
+            let item = read_write_item(&args.item, input)?;
+            print(out, json, &ops::show_model_run(ctx, &item)?)
+        }
+        Command::Model(ModelCommand::Run { item, seed }) => {
+            let item = read_write_item(&item, input)?;
+            print(out, json, &ops::run_model(ctx, &item, seed)?)
         }
         Command::Watch(args) => crate::watch::run(
             ctx,

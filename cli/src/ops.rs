@@ -4,11 +4,11 @@
 
 use custd_sdk::{
     APP_ITEM_KIND_LINK_COLLECTION, APP_ITEM_KIND_MEASUREMENT_PROJECT, APP_ITEM_KIND_MEETING,
-    APP_ITEM_KIND_PLAN, ApiError, AppClient, AppForecastStory, AppItemCreate, AppItemRead, AppLink,
-    AppMeasurementProjectCreate, AppMeeting, AppReadOptions, Conditional, Error,
-    MeasurementForecastRun, MeasurementForecastRunRequest, MeasurementObservation,
-    MeasurementObservationBulk, MeasurementSeriesCreate, MeasurementTargetCreate, ProjectComplete,
-    ProjectEstimateCreate,
+    APP_ITEM_KIND_PLAN, APP_ITEM_KIND_UNCERTAINTY_MODEL, ApiError, AppClient, AppForecastStory,
+    AppItemCreate, AppItemRead, AppLink, AppMeasurementProjectCreate, AppMeeting, AppModelRun,
+    AppModelRunRequest, AppReadOptions, Conditional, Error, MeasurementForecastRun,
+    MeasurementForecastRunRequest, MeasurementObservation, MeasurementObservationBulk,
+    MeasurementSeriesCreate, MeasurementTargetCreate, ProjectComplete, ProjectEstimateCreate,
 };
 use serde::Serialize;
 
@@ -23,8 +23,6 @@ const COUNTER_PROJECT_KIND: &str = "deadline_forecast";
 /// The first series' code tells the item kinds apart, as in the web app's `itemKindOf`.
 pub const COUNTER_SERIES_CODE: &str = "value";
 pub const PROJECT_SERIES_CODE: &str = "estimate";
-/// The SDK has no constant for model items yet; the web app's SDK names it `uncertainty_model`.
-const APP_ITEM_KIND_MODEL: &str = "uncertainty_model";
 const CLAIMED_BY_SOMEONE_ELSE: &str = "app_item_claimed";
 const COMPLETION_INCREASE: &str = "increase";
 const SOURCE_MANUAL: &str = "manual";
@@ -126,7 +124,7 @@ pub fn kind_of_item_kind(kind: &str) -> Option<ItemKind> {
         APP_ITEM_KIND_LINK_COLLECTION => Some(ItemKind::Dashboard),
         APP_ITEM_KIND_MEETING => Some(ItemKind::Meeting),
         APP_ITEM_KIND_PLAN => Some(ItemKind::Plan),
-        APP_ITEM_KIND_MODEL => Some(ItemKind::Model),
+        APP_ITEM_KIND_UNCERTAINTY_MODEL => Some(ItemKind::Model),
         _ => None,
     }
 }
@@ -164,6 +162,33 @@ pub fn latest_forecast(
         Err(Error::Api(ApiError { status: 404, .. })) => Ok(None),
         Err(error) => Err(error.into()),
     }
+}
+
+pub fn show_model_run(ctx: &Context, reference: &str) -> CliResult<AppModelRun> {
+    let resolved = resolve(ctx, reference)?;
+    let app = ctx.app()?;
+    match resolved
+        .link(&app)
+        .latest_model_run(&AppReadOptions::default())?
+    {
+        Conditional::Modified { value, .. } => Ok(value),
+        Conditional::NotModified => Err(CliError::Fetch(
+            "unexpected 304 without If-None-Match".to_owned(),
+        )),
+    }
+}
+
+pub fn run_model(ctx: &Context, reference: &str, seed: Option<i64>) -> CliResult<AppModelRun> {
+    let (resolved, read) = read_owned(ctx, reference)?;
+    if item_kind(&read) != ItemKind::Model {
+        return Err(CliError::WrongKind("this item is not a model".to_owned()));
+    }
+    let app = ctx.app()?;
+    Ok(resolved.link(&app).run_model(&AppModelRunRequest {
+        seed: seed.unwrap_or_else(now_seconds),
+        sample_count: None,
+        sensitivity_output: None,
+    })?)
 }
 
 // ---- Reports ----
@@ -762,6 +787,11 @@ pub fn item_report(
         .map(|p| p.name.clone())
         .or_else(|| meeting.map(|m| m.name.clone()))
         .or_else(|| read.plan.as_ref().and_then(|plan| plan.name.clone()))
+        .or_else(|| {
+            read.uncertainty_model
+                .as_ref()
+                .map(|model| model.name.clone())
+        })
         .or_else(|| stored.map(|s| s.name.clone()))
         .unwrap_or_else(|| kind.label().to_owned());
     ItemReport {

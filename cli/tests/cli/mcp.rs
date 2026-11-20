@@ -53,6 +53,8 @@ fn an_agent_adds_a_measurement_and_reads_the_new_forecast() {
     };
     assert_eq!(hint("read_forecast", "readOnlyHint"), true);
     assert_eq!(hint("list_items", "readOnlyHint"), true);
+    assert_eq!(hint("read_model_run", "readOnlyHint"), true);
+    assert_eq!(hint("run_model", "readOnlyHint"), false);
     assert_eq!(hint("add_measurement", "readOnlyHint"), false);
     assert_eq!(hint("create_counter", "destructiveHint"), false);
 

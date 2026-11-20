@@ -32,7 +32,12 @@ impl View {
                     .filter(|item| {
                         matches!(
                             item.kind,
-                            Some(ItemKind::Counter | ItemKind::Project | ItemKind::Plan) | None
+                            Some(
+                                ItemKind::Counter
+                                    | ItemKind::Project
+                                    | ItemKind::Plan
+                                    | ItemKind::Model
+                            ) | None
                         )
                     })
                     .collect();
@@ -53,6 +58,13 @@ impl View {
                         Ok(progress) => self.progress = progress,
                         Err(error) => {
                             self.status = format!("Progress could not be loaded: {error}")
+                        }
+                    }
+                } else if item.kind == ItemKind::Model {
+                    match ops::show_model_run(ctx, reference) {
+                        Ok(run) => self.progress = Some(model_progress(&run)),
+                        Err(error) => {
+                            self.status = format!("Model results could not be loaded: {error}")
                         }
                     }
                 }
@@ -80,6 +92,32 @@ impl View {
             Err(error) => self.status = error.to_string(),
         }
     }
+}
+
+fn model_progress(run: &custd_sdk::AppModelRun) -> String {
+    const BARS: [char; 9] = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    let mut text = run.text();
+    for quantity in &run.quantities {
+        let Some(summary) = &quantity.summary else {
+            continue;
+        };
+        let counts = &summary.histogram.counts;
+        let Some(maximum) = counts.iter().copied().max().filter(|&value| value > 0) else {
+            continue;
+        };
+        let bars: String = counts
+            .iter()
+            .map(|&count| {
+                let level = (u64::from(count) * 8).div_ceil(u64::from(maximum));
+                BARS[level as usize]
+            })
+            .collect();
+        text.push_str(&format!(
+            "\n{}  {:.3} [{bars}] {:.3}",
+            quantity.name, summary.histogram.min, summary.histogram.max
+        ));
+    }
+    text
 }
 
 fn counter_progress(
