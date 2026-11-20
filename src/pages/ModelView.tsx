@@ -72,7 +72,14 @@ export function ModelView({ data, access, read, live, showOwnerTools, ownerRoute
         <details className="more section">
           <summary>Try other values</summary>
           <div className="more__body">
-            <ModelCalculator version={model.version} inputs={modelInputs(model)} outputs={outputs} access={access} />
+            <ModelCalculator
+              key={model.latestVersion}
+              version={model.version}
+              inputs={modelInputs(model)}
+              outputs={outputs}
+              access={access}
+              {...(result?.versionNumber === model.latestVersion ? { baseline: result } : {})}
+            />
           </div>
         </details>
       ) : null}

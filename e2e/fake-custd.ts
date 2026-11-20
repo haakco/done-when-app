@@ -17,6 +17,8 @@ import type {
   AppMeeting,
   AppMeetingBlock,
   AppMeasurementProject,
+  AppModelCalculateRequest,
+  AppModelCalculateResult,
   AppModelQuantity,
   AppModelQuantityResult,
   AppModelRun,
@@ -211,6 +213,16 @@ export class FakeCustd {
         return this.conditional(request, `"${caller.item.version}"`, () => this.story(caller.item));
       case "POST /api/v1/app/item/model/versions":
         return json(201, this.change(caller, () => { this.saveVersion(caller.item, body.quantities as AppModelQuantity[], (body.note as string | undefined) ?? ""); }));
+      case "POST /api/v1/app/item/model/copy": {
+        const model = this.owner(caller).model;
+        if (!model?.version) throw new Problem(409, "app_model_version_missing");
+        return json(201, this.create({
+          kind: "uncertainty_model",
+          uncertaintyModel: { name: `Copy of ${model.name}`, description: model.description, quantities: model.version.quantities },
+        }, null));
+      }
+      case "POST /api/v1/app/models/calculate":
+        return json(200, this.calculateModel(caller, body as AppModelCalculateRequest));
       case "POST /api/v1/app/models/runs":
         return json(201, this.runModel(caller, body.sensitivityOutput as string | undefined));
       case "GET /api/v1/app/models/latest": {
@@ -676,8 +688,43 @@ export class FakeCustd {
     const item = this.owner(caller);
     const version = item.model?.version;
     if (!item.model || !version) throw new Problem(409, "app_model_version_missing");
+    const quantities = this.modelQuantities(version.quantities);
+    const inputs = version.quantities.filter((quantity) => quantity.kind === "input").map((quantity) => quantity.name);
+    const run: AppModelRun = {
+      runUuid: crypto.randomUUID(),
+      modelUuid: item.model.modelUuid,
+      versionNumber: version.versionNumber,
+      trigger: "request",
+      seed: 1,
+      sampleCount: 10000,
+      createdAt: new Date().toISOString(),
+      quantities,
+      boundInputs: [],
+      ...(sensitivityOutput
+        ? { sensitivityOutput, sensitivity: { output: sensitivityOutput, inputs: inputs.map((name, index) => ({ name, rankCorrelation: 0.8 / (index + 1), share: 1 / inputs.length })) } }
+        : {}),
+    };
+    item.modelRuns.push(run);
+    this.touch(item);
+    return run;
+  }
+
+  private calculateModel(caller: Caller, request: AppModelCalculateRequest): AppModelCalculateResult {
+    const model = caller.item.model;
+    if (!model?.version) throw new Problem(409, "app_model_version_missing");
+    const overrides = new Map((request.inputs ?? []).map(({ name, input }) => [name, input]));
+    const quantities = model.version.quantities.map((quantity) =>
+      quantity.kind === "input" ? { ...quantity, input: overrides.get(quantity.name) ?? quantity.input } : quantity);
+    return {
+      modelUuid: model.modelUuid, versionNumber: model.version.versionNumber,
+      seed: request.seed ?? 1, sampleCount: request.sampleCount ?? 10000,
+      quantities: this.modelQuantities(quantities).filter(({ name }) => request.outputs.includes(name)),
+    };
+  }
+
+  private modelQuantities(quantities: AppModelQuantity[]): AppModelQuantityResult[] {
     const centre = new Map<string, number>();
-    const quantities: AppModelQuantityResult[] = version.quantities.map((quantity) => {
+    return quantities.map((quantity) => {
       let mid = 0;
       let spread = 0;
       if (quantity.kind === "input" && quantity.input.shape === "point") mid = quantity.input.value;
@@ -702,24 +749,6 @@ export class FakeCustd {
         },
       };
     });
-    const inputs = version.quantities.filter((quantity) => quantity.kind === "input").map((quantity) => quantity.name);
-    const run: AppModelRun = {
-      runUuid: crypto.randomUUID(),
-      modelUuid: item.model.modelUuid,
-      versionNumber: version.versionNumber,
-      trigger: "request",
-      seed: 1,
-      sampleCount: 10000,
-      createdAt: new Date().toISOString(),
-      quantities,
-      boundInputs: [],
-      ...(sensitivityOutput
-        ? { sensitivityOutput, sensitivity: { output: sensitivityOutput, inputs: inputs.map((name, index) => ({ name, rankCorrelation: 0.8 / (index + 1), share: 1 / inputs.length })) } }
-        : {}),
-    };
-    item.modelRuns.push(run);
-    this.touch(item);
-    return run;
   }
 
   // ---- Meetings: Custd's run engine in small; an overrun shrinks later blocks in proportion ----

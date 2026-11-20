@@ -181,6 +181,11 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
     await expect(viewerPage.getByText("total: about 22.5")).toBeVisible();
     await expect(viewerPage.getByRole("heading", { name: "Owner tools" })).toHaveCount(0);
     await expect(viewerPage.getByRole("button", { name: "Run model" })).toHaveCount(0);
+    await viewerPage.getByText("Try other values", { exact: true }).click();
+    await viewerPage.getByLabel("rate", { exact: true }).fill("8");
+    await viewerPage.getByRole("button", { name: "Calculate", exact: true }).click();
+    await expect(viewerPage.getByText(/60 \(90%:/)).toBeVisible();
+    await expect(viewerPage.getByText("total: about 22.5")).toBeVisible();
     await viewerPage.locator("summary", { hasText: "Download" }).click();
     const summaryDownload = viewerPage.waitForEvent("download");
     await viewerPage.getByRole("button", { name: "Run summary CSV" }).click();
@@ -220,6 +225,10 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
   });
   await expect(page.getByText("Version 2", { exact: true })).toBeVisible();
   await expect(page.getByText("total: about 22.5")).toBeVisible();
+  await page.getByRole("button", { name: "Copy model" }).click();
+  await expect(page.getByRole("heading", { name: "Copy of Monthly cost" })).toBeVisible();
+  expect(page.url()).not.toEqual(modelOwnerUrl);
+  await expect(page.getByText("Version 1", { exact: true })).toBeVisible();
 });
 
 test("the landing forecast can be tried on a phone without creating an item", async ({ page, fake }) => {
