@@ -63,14 +63,6 @@
     {
       "route": "/edit/**",
       "headers": [
-    {
-      "route": "/embed/model/*",
-      "framing": "any",
-      "headers": [
-        { "name": "Referrer-Policy", "value": "no-referrer" },
-        { "name": "X-Robots-Tag", "value": "noindex" }
-      ]
-    },
         {
           "name": "Referrer-Policy",
           "value": "no-referrer"
