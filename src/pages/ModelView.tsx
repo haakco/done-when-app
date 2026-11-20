@@ -236,7 +236,9 @@ function CounterBinding({ data, access, model }: { data: DoneWhenData; access: I
         event.preventDefault();
         const fields = new FormData(event.currentTarget);
         const field = Object.values(APP_MODEL_FORECAST_FIELDS).find((value) => value === fields.get("field"));
-        if (field) save.mutate({ name: String(fields.get("quantity")), link: String(fields.get("link")), field });
+        const name = fields.get("quantity");
+        const link = fields.get("link");
+        if (field && typeof name === "string" && typeof link === "string") save.mutate({ name, link, field });
       }}>
         <label className="field">
           Input quantity

@@ -185,10 +185,13 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
   const versionRequest = page.waitForRequest((request) =>
     request.method() === "POST" && request.url().endsWith("/api/v1/app/item/model/versions"));
   await page.getByRole("button", { name: "Save linked input" }).click();
-  expect((await versionRequest).postDataJSON().quantities).toContainEqual({
-    name: "rate",
-    kind: "input",
-    input: { shape: "bound", source: { kind: "counter_forecast", projectUuid: expect.any(String), field: "rate_per_day" } },
+  const payload: unknown = (await versionRequest).postDataJSON();
+  expect(payload).toMatchObject({
+    quantities: expect.arrayContaining([{
+      name: "rate",
+      kind: "input",
+      input: { shape: "bound", source: { kind: "counter_forecast", projectUuid: expect.any(String), field: "rate_per_day" } },
+    }]),
   });
   await expect(page.getByText("Version 2", { exact: true })).toBeVisible();
   await expect(page.getByText("total: about 22.5")).toBeVisible();
