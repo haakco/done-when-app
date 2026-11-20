@@ -49,6 +49,8 @@ const MEASUREMENT_BATCH = 1000;
 /** A dashboard download reads this many items at a time. */
 const DASHBOARD_READS_AT_ONCE = 5;
 
+type CounterForecastSource = { projectUuid: string; token: string };
+
 /**
  * Every write the app makes, and the reads that are not live. Live item reads go through the
  * SDK's self-refreshing hooks in `live.ts`. Each access is an owner link token, a share link
@@ -71,7 +73,7 @@ export type DoneWhenData = {
   cancelProject(owner: ItemAccess): Promise<void>;
 
   createModel(draft: ModelDraft): Promise<CreatedItem>;
-  readCounterForecastSource(pasted: string): Promise<string>;
+  readCounterForecastSource(pasted: string): Promise<CounterForecastSource>;
   copyModel(owner: ItemAccess): Promise<CreatedItem>;
   saveModelVersion(owner: ItemAccess, request: AppModelVersionCreateRequest): Promise<void>;
   /** Runs the latest version and stores the run every viewer sees. */
@@ -203,11 +205,12 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
       return created("model", await items.createItem(modelCreateRequest(draft)));
     },
     async readCounterForecastSource(pasted) {
-      const read = await items.readItem(pastedToken(pasted));
+      const token = pastedToken(pasted);
+      const read = await items.readItem(token);
       if (read.status !== "modified" || !read.data.measurementProject || itemKindOf(read.data) !== "counter") {
         throw new PastedLinkError("Choose a Done When counter for this linked input.");
       }
-      return read.data.measurementProject.projectUuid;
+      return { projectUuid: read.data.measurementProject.projectUuid, token };
     },
     async copyModel(owner) {
       return created("model", await items.copyModel(owner));

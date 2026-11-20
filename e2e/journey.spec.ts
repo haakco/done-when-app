@@ -187,6 +187,7 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
   await page.getByRole("button", { name: "Save linked input" }).click();
   const payload: unknown = (await versionRequest).postDataJSON();
   expect(payload).toMatchObject({
+    counterLinks: [new URL(counterLink).pathname.split("/").at(-1)],
     quantities: expect.arrayContaining([{
       name: "rate",
       kind: "input",

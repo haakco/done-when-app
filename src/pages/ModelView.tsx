@@ -213,7 +213,7 @@ function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: 
 function CounterBinding({ data, access, model }: { data: DoneWhenData; access: ItemAccess; model: Model }) {
   const save = useMutation({
     mutationFn: async ({ name, link, field }: { name: string; link: string; field: AppModelForecastField }) => {
-      const projectUuid = await data.readCounterForecastSource(link);
+      const { projectUuid, token } = await data.readCounterForecastSource(link);
       const quantities = (model.version?.quantities ?? []).map((quantity) =>
         quantity.name === name && quantity.kind === APP_MODEL_QUANTITY_KINDS.input
           ? {
@@ -225,7 +225,7 @@ function CounterBinding({ data, access, model }: { data: DoneWhenData; access: I
           }
           : quantity,
       );
-      await data.saveModelVersion(access, { quantities });
+      await data.saveModelVersion(access, { quantities, counterLinks: [token] });
     },
   });
 
