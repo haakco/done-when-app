@@ -168,6 +168,11 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
   }
   await page.getByRole("button", { name: "Save version" }).click();
   await expect(page.getByText("Version 1")).toBeVisible();
+  await page.locator("summary", { hasText: /^Alerts$/ }).click();
+  await page.getByLabel("Model output", { exact: true }).selectOption("total");
+  await page.getByLabel("Alert threshold", { exact: true }).fill("20");
+  await page.getByRole("button", { name: "Add alert", exact: true }).click();
+  await expect(page.getByText("total: 95th percentile rises above 20", { exact: true })).toBeVisible();
   await page.getByText("Run with a decision", { exact: true }).click();
   await page.getByLabel("Decision threshold").fill("20");
   const decisionRun = page.waitForRequest((request) =>

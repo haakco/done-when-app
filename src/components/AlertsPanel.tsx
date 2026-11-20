@@ -12,7 +12,7 @@ import { useSession } from "./Session";
 const RULE_CHOICES: Record<ItemKind, AppAlertRuleType[]> = {
   counter: [APP_ALERT_RULE_TYPES.targetReached, APP_ALERT_RULE_TYPES.deadlineProbabilityBelow, APP_ALERT_RULE_TYPES.forecastMovedInsideTarget],
   project: [APP_ALERT_RULE_TYPES.estimateStale],
-  model: [],
+  model: [APP_ALERT_RULE_TYPES.modelRangeAbove],
   meeting: [],
   dashboard: [],
   plan: [],
@@ -23,6 +23,7 @@ const RULE_LABEL: Record<AppAlertRuleType, string> = {
   deadline_probability_below: "The chance of making the date drops below…",
   forecast_moved_inside_target: "The forecast moves inside the deadline",
   estimate_stale: "No new estimate for…",
+  model_range_above: "The 95th percentile rises above a threshold",
 };
 
 export function ruleText(rule: AppAlertRuleSpec): string {
@@ -32,13 +33,16 @@ export function ruleText(rule: AppAlertRuleSpec): string {
   if (rule.type === APP_ALERT_RULE_TYPES.estimateStale && rule.staleDays !== undefined) {
     return `No new estimate for ${rule.staleDays} days`;
   }
+  if (rule.type === APP_ALERT_RULE_TYPES.modelRangeAbove && rule.modelOutput && rule.threshold !== undefined) {
+    return `${rule.modelOutput}: 95th percentile rises above ${rule.threshold}`;
+  }
   return RULE_LABEL[rule.type];
 }
 
-type Props = { data: DoneWhenData; access: ItemAccess; kind: ItemKind };
+type Props = { data: DoneWhenData; access: ItemAccess; kind: ItemKind; modelOutputs?: string[] };
 
 /** Alert rules and where they go: a signed webhook, or email for a signed-in owner. */
-export function AlertsPanel({ data, access, kind }: Props) {
+export function AlertsPanel({ data, access, kind, modelOutputs }: Props) {
   const key = ["alerts", typeof access === "string" ? access : access.item] as const;
   const client = useQueryClient();
   const settings = useQuery({ queryKey: key, queryFn: () => data.alertSettings(access) });
@@ -54,7 +58,7 @@ export function AlertsPanel({ data, access, kind }: Props) {
         <p className="notice notice--warn">Alerts are saved, but this Done When cannot send them yet.</p>
       ) : null}
       <RuleList data={data} access={access} rules={rules} onChange={refresh} />
-      <AddRuleForm data={data} access={access} kind={kind} onAdded={refresh} />
+      <AddRuleForm data={data} access={access} kind={kind} modelOutputs={modelOutputs ?? []} onAdded={refresh} />
       <h3>Where alerts go</h3>
       {webhooks.length === 0 ? <p className="small muted">No webhooks yet.</p> : null}
       <ul className="plain-list">
@@ -105,7 +109,7 @@ function RuleList({ data, access, rules, onChange }: { data: DoneWhenData; acces
   );
 }
 
-function AddRuleForm({ data, access, kind, onAdded }: Props & { onAdded: () => unknown }) {
+function AddRuleForm({ data, access, kind, modelOutputs = [], onAdded }: Props & { onAdded: () => unknown }) {
   const choices = RULE_CHOICES[kind];
   const [type, setType] = useState<AppAlertRuleType>(choices[0] ?? APP_ALERT_RULE_TYPES.targetReached);
   const [threshold, setThreshold] = useState("50");
@@ -119,6 +123,14 @@ function AddRuleForm({ data, access, kind, onAdded }: Props & { onAdded: () => u
         const rule: AppAlertRuleSpec = { type };
         if (type === APP_ALERT_RULE_TYPES.deadlineProbabilityBelow) rule.threshold = Number(threshold) / 100;
         if (type === APP_ALERT_RULE_TYPES.estimateStale) rule.staleDays = Number(staleDays);
+        if (type === APP_ALERT_RULE_TYPES.modelRangeAbove) {
+          const fields = new FormData(event.currentTarget);
+          const output = modelOutputs.find((name) => name === fields.get("modelOutput"));
+          const modelThreshold = fields.get("modelThreshold");
+          if (!output || typeof modelThreshold !== "string") return;
+          rule.modelOutput = output;
+          rule.threshold = Number(modelThreshold);
+        }
         add.mutate(rule);
       }}
     >
@@ -143,8 +155,18 @@ function AddRuleForm({ data, access, kind, onAdded }: Props & { onAdded: () => u
           {(control) => <input {...control} type="number" min={1} max={365} required value={staleDays} onChange={(event) => { setStaleDays(event.target.value); }} />}
         </Field>
       ) : null}
+      {type === APP_ALERT_RULE_TYPES.modelRangeAbove ? (
+        <>
+          <Field label="Model output">
+            {(control) => <select {...control} name="modelOutput" required>{modelOutputs.map((output) => <option key={output}>{output}</option>)}</select>}
+          </Field>
+          <Field label="Alert threshold">
+            {(control) => <input {...control} name="modelThreshold" type="number" step="any" required />}
+          </Field>
+        </>
+      ) : null}
       <div className="button-row">
-        <button type="submit" className="button" disabled={add.isPending}>
+        <button type="submit" className="button" disabled={add.isPending || (type === APP_ALERT_RULE_TYPES.modelRangeAbove && modelOutputs.length === 0)}>
           {add.isPending ? "Adding…" : "Add alert"}
         </button>
       </div>

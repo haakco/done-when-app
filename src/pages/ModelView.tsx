@@ -3,6 +3,7 @@ import { APP_LINK_ROLES, APP_MODEL_FORECAST_FIELDS, APP_MODEL_INPUT_SHAPES, APP_
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useNavigate } from "react-router";
+import { AlertsPanel } from "../components/AlertsPanel";
 import { CopyButton } from "../components/CopyButton";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { Field } from "../components/Field";
@@ -265,6 +266,14 @@ function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: 
           <QuantityImport data={data} access={access} model={model} />
         </div>
       </details>
+      {model.version ? (
+        <details className="more">
+          <summary>Alerts</summary>
+          <div className="more__body">
+            <AlertsPanel data={data} access={access} kind="model" modelOutputs={model.version.quantities.map(({ name }) => name)} />
+          </div>
+        </details>
+      ) : null}
       <details className="more">
         <summary>Links, expiry and my items</summary>
         <div className="more__body">
