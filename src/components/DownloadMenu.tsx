@@ -10,12 +10,13 @@ type DownloadMenuProps = {
   build: () => Workbook | Promise<Workbook>;
   /** One line under the choices, e.g. what the file leaves out. */
   note?: string | null;
+  runSummaryCsv?: () => string;
 };
 
-type Format = "xlsx" | "csv";
+type Format = "xlsx" | "csv" | "run-summary";
 
 /** One "Download" menu: Excel with every sheet, or CSV of the main table. */
-export function DownloadMenu({ name, build, note = null }: DownloadMenuProps) {
+export function DownloadMenu({ name, build, note = null, runSummaryCsv }: DownloadMenuProps) {
   const menu = useRef<HTMLDetailsElement>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ text: string; failed: boolean } | null>(null);
@@ -35,10 +36,15 @@ export function DownloadMenu({ name, build, note = null }: DownloadMenuProps) {
     setBusy(true);
     setStatus(null);
     try {
-      const workbook = await build();
       const now = new Date();
-      const file = exportFileName(name, now, format);
-      const blob = format === "xlsx" ? await writeXlsx(workbook) : new Blob([workbookCsv(workbook)], { type: "text/csv;charset=utf-8" });
+      const file = exportFileName(format === "run-summary" ? `${name} run summary` : name, now, format === "xlsx" ? "xlsx" : "csv");
+      let blob: Blob;
+      if (format === "run-summary" && runSummaryCsv) {
+        blob = new Blob([runSummaryCsv()], { type: "text/csv;charset=utf-8" });
+      } else {
+        const workbook = await build();
+        blob = format === "xlsx" ? await writeXlsx(workbook) : new Blob([workbookCsv(workbook)], { type: "text/csv;charset=utf-8" });
+      }
       saveFile(blob, file);
       setStatus({ text: `Downloaded ${file}.`, failed: false });
       if (menu.current) menu.current.open = false;
@@ -61,6 +67,11 @@ export function DownloadMenu({ name, build, note = null }: DownloadMenuProps) {
           <button type="button" className="button" disabled={busy} onClick={() => { void download("csv"); }}>
             CSV
           </button>
+          {runSummaryCsv ? (
+            <button type="button" className="button" disabled={busy} onClick={() => { void download("run-summary"); }}>
+              Run summary CSV
+            </button>
+          ) : null}
           <p className="small muted">{note ?? "Excel has every sheet; CSV has the main table, ready to import again."}</p>
         </div>
       </details>

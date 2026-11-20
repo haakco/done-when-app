@@ -1,5 +1,5 @@
 import { MeasureNextPanel, ModelCalculator, ModelEditor, QuantityHistogram, SensitivityView } from "@haakco/custd-react";
-import { APP_MODEL_FORECAST_FIELDS, APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, APP_MODEL_SOURCE_KINDS, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
+import { APP_MODEL_FORECAST_FIELDS, APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, APP_MODEL_SOURCE_KINDS, modelRunSummaryCsv, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useNavigate } from "react-router";
@@ -37,6 +37,7 @@ export function ModelView({ data, access, read, live, showOwnerTools, ownerRoute
   const model = modelOf(read);
   const run = useModelRun(access);
   const outputs = modelOutputs(model);
+  const result = run.status === "ready" ? run.data : null;
   return (
     <article aria-labelledby="item-name" className="item">
       <ItemHeader
@@ -46,7 +47,13 @@ export function ModelView({ data, access, read, live, showOwnerTools, ownerRoute
         meta={model}
         title={model.name}
         owner={showOwnerTools}
-        actions={<DownloadMenu name={model.name} build={() => modelWorkbook(model, run.status === "ready" ? run.data : null, new Date())} />}
+        actions={(
+          <DownloadMenu
+            name={model.name}
+            build={() => modelWorkbook(model, result?.versionNumber === model.latestVersion ? result : null, new Date())}
+            {...(result ? { runSummaryCsv: () => modelRunSummaryCsv(result, result.versionNumber === model.latestVersion ? model.version?.quantities : []) } : {})}
+          />
+        )}
       >
         <span className="small muted">{model.latestVersion > 0 ? `Version ${model.latestVersion}` : "No quantities yet"}</span>
       </ItemHeader>

@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { copyShareUrl, createCounter, expect, routeToFake, test } from "./fixtures";
 
 const HISTORY = ["timestamp,value", "2026-11-01T00:00:00Z,10", "2026-11-02T00:00:00Z,20", "2026-11-03T00:00:00Z,30"].join("\n");
@@ -180,6 +181,14 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
     await expect(viewerPage.getByText("total: about 22.5")).toBeVisible();
     await expect(viewerPage.getByRole("heading", { name: "Owner tools" })).toHaveCount(0);
     await expect(viewerPage.getByRole("button", { name: "Run model" })).toHaveCount(0);
+    await viewerPage.locator("summary", { hasText: "Download" }).click();
+    const summaryDownload = viewerPage.waitForEvent("download");
+    await viewerPage.getByRole("button", { name: "Run summary CSV" }).click();
+    const summary = await summaryDownload;
+    expect(summary.suggestedFilename()).toMatch(/run-summary.*\.csv$/);
+    const csv = await readFile(await summary.path(), "utf8");
+    expect(csv).toContain("quantity,unit,mean,std_dev,p5,p25,p50,p75,p95,error");
+    expect(csv).toContain("total,,22.5,");
   } finally {
     await viewer.close();
   }
