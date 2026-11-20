@@ -104,6 +104,13 @@
       "description": "Likely {{estimateLow}} – {{estimateHigh}}, {{chance}}% chance by {{deliveryTarget}}."
     },
     {
+      "route": "/m/*",
+      "kind": "uncertainty_model",
+      "cardTemplate": "share-cards/model.svg",
+      "title": "{{name}}",
+      "description": "Explore the model and its latest results in Done When."
+    },
+    {
       "route": "/d/*",
       "kind": "link_collection",
       "cardTemplate": "share-cards/dashboard.svg",
