@@ -1,6 +1,6 @@
 /** Typed shapes the pages render, mapped from Custd's app item reads in `mappers.ts`. */
 
-import type { AppForecastMethod, AppItemAccess, AppItemLink, AppItemOwnership, AppLinkRole, AppMeeting, AppModelVersion } from "@haakco/custd-sdk/browser";
+import type { AppForecastMethod, AppItemAccess, AppItemLink, AppItemOwnership, AppLinkRole, AppMeeting, AppModelQuantity, AppModelVersion } from "@haakco/custd-sdk/browser";
 
 export type ItemKind = "counter" | "project" | "model" | "meeting" | "dashboard" | "plan";
 
@@ -101,7 +101,7 @@ export type Model = ItemMeta & {
   queuedRunError: string | null;
 };
 
-export type ModelDraft = { name: string; description: string; expiresAfterSeconds: number };
+export type ModelDraft = { name: string; description: string; expiresAfterSeconds: number; quantities?: AppModelQuantity[] };
 
 /** A meeting item: its agenda as Custd runs it. */
 export type Meeting = ItemMeta & { meeting: AppMeeting };

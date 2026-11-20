@@ -140,6 +140,21 @@ test("the owner link notice shows once and the item is listed as recent on this 
   await expect(page.getByRole("button", { name: "Add measurement" })).toBeVisible();
 });
 
+test("start a model with one estimate from home", async ({ page }) => {
+  await page.goto("/");
+  const starter = page.getByLabel("Start with one estimate");
+  await starter.fill("Monthly hosting: 800 to 500");
+  await page.getByRole("button", { name: "Start model" }).click();
+  await expect(starter).toHaveAttribute("aria-invalid", "true");
+  await expect(starter).toHaveAccessibleDescription(/low end.*below the high end/);
+  await starter.fill("Monthly hosting: 500 to 800");
+  await starter.press("Enter");
+  await expect(page.getByRole("heading", { name: "Monthly hosting" })).toBeVisible();
+  await expect(page.getByText("Version 1", { exact: true })).toBeVisible();
+  await page.getByText("Edit quantities", { exact: true }).click();
+  await expect(page.getByLabel("Value", { exact: true })).toHaveValue("500 to 800");
+});
+
 test("an owner runs a model and shares the results with a viewer and dashboard", async ({ page, browser, fake }) => {
   await page.goto("/new/model");
   await page.getByLabel("What are you working out?").fill("Monthly cost");

@@ -1,3 +1,5 @@
+import { parseModelValue } from "@haakco/custd-react";
+import { useMutation } from "@tanstack/react-query";
 import { lazy, Suspense, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { CounterForm } from "../components/CounterForm";
@@ -5,7 +7,12 @@ import { ForecastExample } from "../components/ForecastExample";
 import { Field } from "../components/Field";
 import { RecentList } from "../components/RecentList";
 import { WithData } from "../components/WithData";
-import { parseAppItemLink } from "@haakco/custd-sdk/browser";
+import { APP_MODEL_QUANTITY_KINDS, parseAppItemLink } from "@haakco/custd-sdk/browser";
+
+import { WriteError } from "../components/ItemStates";
+import type { DoneWhenData, ModelDraft } from "../data";
+import { DEFAULT_EXPIRY_SECONDS } from "../lib/expiry";
+import { ownerPath } from "../lib/links";
 
 const PlanExample = lazy(() => import("./PlanExample"));
 
@@ -39,7 +46,7 @@ export function HomePage() {
             <h3>
               <Link to="/new/model">Build a model</Link>
             </h3>
-            <p className="muted small">Put ranges on what you are unsure of and see the range of the answer.</p>
+            <WithData>{({ data }) => <QuickModelForm data={data} />}</WithData>
           </li>
           <li className="card">
             <h3>
@@ -64,6 +71,50 @@ export function HomePage() {
       <RecentList />
       <OpenLink />
     </>
+  );
+}
+
+function QuickModelForm({ data }: { data: DoneWhenData }) {
+  const navigate = useNavigate();
+  const [error, setError] = useState("");
+  const create = useMutation({
+    mutationFn: (draft: ModelDraft) => data.createModel(draft),
+    onSuccess: (created) => navigate(ownerPath("model", created.ownerToken)),
+  });
+  return (
+    <form className="form" onSubmit={(event) => {
+      event.preventDefault();
+      const line = new FormData(event.currentTarget).get("model");
+      if (typeof line !== "string") return;
+      const separator = line.lastIndexOf(":");
+      const name = line.slice(0, separator).trim();
+      if (separator < 0 || !name || name.length > 255) {
+        setError("Enter a model name followed by a colon and a value.");
+        return;
+      }
+      const parsed = parseModelValue(line.slice(separator + 1));
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+      if (parsed.value.kind !== APP_MODEL_QUANTITY_KINDS.input) {
+        setError("Start with a number, a range like 5 to 10, or a proportion like 3 of 10.");
+        return;
+      }
+      setError("");
+      create.mutate({
+        name, description: "", expiresAfterSeconds: DEFAULT_EXPIRY_SECONDS,
+        quantities: [{ name: "estimate", ...parsed.value }],
+      });
+    }}>
+      <Field label="Start with one estimate" hint="For example: Monthly cost: 500 to 800" error={error}>
+        {(control) => <input {...control} name="model" required onChange={() => { setError(""); }} />}
+      </Field>
+      <button type="submit" className="button" disabled={create.isPending}>
+        {create.isPending ? "Creating…" : "Start model"}
+      </button>
+      <WriteError error={create.error} />
+    </form>
   );
 }
 

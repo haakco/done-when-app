@@ -190,7 +190,11 @@ export function modelCreateRequest(draft: ModelDraft): AppItemCreateRequest {
   return {
     kind: APP_ITEM_KINDS.uncertaintyModel,
     idleExpirySeconds: draft.expiresAfterSeconds,
-    uncertaintyModel: { name: draft.name, ...(draft.description ? { description: draft.description } : {}) },
+    uncertaintyModel: {
+      name: draft.name,
+      ...(draft.description ? { description: draft.description } : {}),
+      ...(draft.quantities ? { quantities: draft.quantities } : {}),
+    },
   };
 }
 
