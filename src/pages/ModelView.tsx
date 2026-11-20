@@ -1,10 +1,11 @@
 import { MeasureNextPanel, ModelCalculator, ModelEditor, QuantityHistogram, SensitivityView } from "@haakco/custd-react";
-import { APP_LINK_ROLES, APP_MODEL_FORECAST_FIELDS, APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, APP_MODEL_SOURCE_KINDS, modelRunSummaryCsv, type AppItemRead, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
+import { APP_LINK_ROLES, APP_MODEL_FORECAST_FIELDS, APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, APP_MODEL_SOURCE_KINDS, modelRunSummaryCsv, type AppItemRead, type AppModelDecision, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { useNavigate } from "react-router";
 import { CopyButton } from "../components/CopyButton";
 import { DownloadMenu } from "../components/DownloadMenu";
+import { Field } from "../components/Field";
 import { ImportPanel } from "../components/ImportPanel";
 import { ItemHeader } from "../components/ItemHeader";
 import { Loading, ReadOnlyNotice, WriteError } from "../components/ItemStates";
@@ -188,14 +189,45 @@ function headline(result: AppModelQuantityResult | undefined, units: Map<string,
 }
 
 function RunButton({ data, access, outputs }: { data: DoneWhenData; access: ItemAccess; outputs: string[] }) {
-  const run = useMutation({ mutationFn: () => data.runModel(access, outputs[0] ? { sensitivityOutput: outputs[0] } : {}) });
+  const run = useMutation({
+    mutationFn: (decision: AppModelDecision | undefined) => data.runModel(access, {
+      ...(outputs[0] ? { sensitivityOutput: decision?.output ?? outputs[0] } : {}),
+      ...(decision ? { decision } : {}),
+    }),
+  });
   return (
-    <div className="button-row section">
-      <button type="button" className="button button--primary" disabled={run.isPending} onClick={() => { run.mutate(); }}>
+    <section className="section">
+      <button type="button" className="button button--primary" disabled={run.isPending} onClick={() => { run.mutate(undefined); }}>
         {run.isPending ? "Running…" : "Run model"}
       </button>
+      {outputs.length > 0 ? (
+        <details className="more">
+          <summary>Run with a decision</summary>
+          <form className="more__body" onSubmit={(event) => {
+            event.preventDefault();
+            const fields = new FormData(event.currentTarget);
+            const output = outputs.find((name) => name === fields.get("output"));
+            const threshold = fields.get("threshold");
+            const valuePerUnit = fields.get("value");
+            if (output && typeof threshold === "string" && typeof valuePerUnit === "string") {
+              run.mutate({ output, threshold: Number(threshold), valuePerUnit: Number(valuePerUnit) });
+            }
+          }}>
+            <Field label="Decision output">
+              {(control) => <select {...control} name="output">{outputs.map((output) => <option key={output}>{output}</option>)}</select>}
+            </Field>
+            <Field label="Decision threshold" hint="Acting pays off when this result is above the threshold.">
+              {(control) => <input {...control} name="threshold" type="number" step="any" required />}
+            </Field>
+            <Field label="Value per unit" hint="How much one unit above the threshold is worth.">
+              {(control) => <input {...control} name="value" type="number" step="any" min="0" required defaultValue="1" />}
+            </Field>
+            <button type="submit" className="button" disabled={run.isPending}>Run decision analysis</button>
+          </form>
+        </details>
+      ) : null}
       <WriteError error={run.error} />
-    </div>
+    </section>
   );
 }
 

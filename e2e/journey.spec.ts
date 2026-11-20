@@ -168,7 +168,15 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
   }
   await page.getByRole("button", { name: "Save version" }).click();
   await expect(page.getByText("Version 1")).toBeVisible();
-  await page.getByRole("button", { name: "Run model" }).click();
+  await page.getByText("Run with a decision", { exact: true }).click();
+  await page.getByLabel("Decision threshold").fill("20");
+  const decisionRun = page.waitForRequest((request) =>
+    request.method() === "POST" && request.url().endsWith("/api/v1/app/models/runs"));
+  await page.getByRole("button", { name: "Run decision analysis" }).click();
+  const runPayload: unknown = (await decisionRun).postDataJSON();
+  expect(runPayload).toMatchObject({
+    sensitivityOutput: "total", decision: { output: "total", threshold: 20, valuePerUnit: 1 },
+  });
   await expect(page.getByText("total: about 22.5")).toBeVisible();
   const modelOwnerUrl = page.url();
   const shareUrl = await copyShareUrl(page);
