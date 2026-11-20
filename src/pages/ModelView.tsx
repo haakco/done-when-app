@@ -1,5 +1,5 @@
 import { MeasureNextPanel, ModelCalculator, ModelEditor, QuantityHistogram, SensitivityView } from "@haakco/custd-react";
-import { APP_MODEL_QUANTITY_KINDS, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
+import { APP_MODEL_FORECAST_FIELDS, APP_MODEL_QUANTITY_KINDS, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { DownloadMenu } from "../components/DownloadMenu";
@@ -24,6 +24,12 @@ export function modelOutputs(model: Model): string[] {
 export function modelInputs(model: Model): string[] {
   return (model.version?.quantities ?? []).filter((quantity) => quantity.kind === APP_MODEL_QUANTITY_KINDS.input).map((quantity) => quantity.name);
 }
+
+const forecastFieldLabels: Record<AppModelForecastField, string> = {
+  [APP_MODEL_FORECAST_FIELDS.completionDays]: "Days to completion",
+  [APP_MODEL_FORECAST_FIELDS.deadlineProbability]: "Chance of meeting the deadline",
+  [APP_MODEL_FORECAST_FIELDS.ratePerDay]: "Rate per day",
+};
 
 export function ModelView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
   const model = modelOf(read);
@@ -78,8 +84,9 @@ function ModelResults({ model, run, outputs }: { model: Model; run: AppModelRun 
       </section>
     );
   }
-  const results = (run.quantities ?? []).filter((result) => outputs.length === 0 || outputs.includes(result.name));
-  const units = new Map((model.version?.quantities ?? []).map((quantity) => [quantity.name, quantity.unit ?? ""]));
+  const currentVersion = run.versionNumber === model.latestVersion;
+  const results = (run.quantities ?? []).filter((result) => !currentVersion || outputs.length === 0 || outputs.includes(result.name));
+  const units = new Map((currentVersion ? model.version?.quantities ?? [] : []).map((quantity) => [quantity.name, quantity.unit ?? ""]));
   return (
     <>
       <section className="summary" aria-label="Summary">
@@ -98,6 +105,23 @@ function ModelResults({ model, run, outputs }: { model: Model; run: AppModelRun 
           );
         })}
       </div>
+      {run.boundInputs?.length ? (
+        <details className="more section">
+          <summary>Linked inputs used in this run</summary>
+          <div className="more__body">
+            <dl>
+              {run.boundInputs.map((input) => (
+                <div key={input.quantity}>
+                  <dt>{input.quantity} · {forecastFieldLabels[input.source.field]}</dt>
+                  <dd>{input.value?.toLocaleString("en") ?? input.detail ?? "Forecast value unavailable"}</dd>
+                  {input.forecastGeneratedAt ? <dd>Forecast from {formatDate(input.forecastGeneratedAt)}</dd> : null}
+                  {input.forecastRunUuid ? <dd>Forecast run <code>{input.forecastRunUuid}</code></dd> : null}
+                </div>
+              ))}
+            </dl>
+          </div>
+        </details>
+      ) : null}
       {run.sensitivity ? (
         <details className="more section">
           <summary>What drives the result?</summary>

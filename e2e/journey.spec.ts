@@ -140,7 +140,7 @@ test("the owner link notice shows once and the item is listed as recent on this 
   await expect(page.getByRole("button", { name: "Add measurement" })).toBeVisible();
 });
 
-test("a model is built, run and shown on a dashboard", async ({ page }) => {
+test("an owner runs a model and shares the results with a viewer and dashboard", async ({ page, browser, fake }) => {
   await page.goto("/new/model");
   await page.getByLabel("What are you working out?").fill("Monthly cost");
   await page.getByRole("button", { name: "Create model" }).click();
@@ -155,6 +155,18 @@ test("a model is built, run and shown on a dashboard", async ({ page }) => {
   await page.getByRole("button", { name: "Run model" }).click();
   await expect(page.getByText("total: about 22.5")).toBeVisible();
   const shareUrl = await copyShareUrl(page);
+  const viewer = await browser.newContext();
+  try {
+    await routeToFake(viewer, fake);
+    const viewerPage = await viewer.newPage();
+    await viewerPage.goto(shareUrl);
+    await expect(viewerPage.getByRole("figure", { name: "total range" })).toBeVisible();
+    await expect(viewerPage.getByText("total: about 22.5")).toBeVisible();
+    await expect(viewerPage.getByRole("heading", { name: "Owner tools" })).toHaveCount(0);
+    await expect(viewerPage.getByRole("button", { name: "Run model" })).toHaveCount(0);
+  } finally {
+    await viewer.close();
+  }
   await page.goto("/new/dashboard");
   await page.getByLabel("Links to show (optional)").fill(shareUrl);
   await page.getByRole("button", { name: "Create dashboard" }).click();
