@@ -23,7 +23,7 @@ import { rememberShareToken } from "../lib/device";
 import { tokenFromPaste } from "../lib/links";
 import type { DashboardRow } from "../lib/exports";
 import { dashboardRow } from "./dashboard-export";
-import { counterCreateRequest, meetingCreateRequest, modelCreateRequest, projectCreateRequest } from "./mappers";
+import { itemKindOf, counterCreateRequest, meetingCreateRequest, modelCreateRequest, projectCreateRequest } from "./mappers";
 import type {
   CounterDraft,
   CreatedItem,
@@ -71,6 +71,8 @@ export type DoneWhenData = {
   cancelProject(owner: ItemAccess): Promise<void>;
 
   createModel(draft: ModelDraft): Promise<CreatedItem>;
+  readCounterForecastSource(pasted: string): Promise<string>;
+  copyModel(owner: ItemAccess): Promise<CreatedItem>;
   saveModelVersion(owner: ItemAccess, request: AppModelVersionCreateRequest): Promise<void>;
   /** Runs the latest version and stores the run every viewer sees. */
   runModel(owner: ItemAccess, request: Omit<AppModelRunRequest, "seed">): Promise<void>;
@@ -200,6 +202,16 @@ export function createDoneWhenData(items: AppItemsClient): DoneWhenData {
     async createModel(draft) {
       return created("model", await items.createItem(modelCreateRequest(draft)));
     },
+    async readCounterForecastSource(pasted) {
+      const read = await items.readItem(pastedToken(pasted));
+      if (read.status !== "modified" || !read.data.measurementProject || itemKindOf(read.data) !== "counter") {
+        throw new PastedLinkError("Choose a Done When counter for this linked input.");
+      }
+      return read.data.measurementProject.projectUuid;
+    },
+    async copyModel(owner) {
+      return created("model", await items.copyModel(owner));
+    },
     async saveModelVersion(owner, request) {
       await items.addModelVersion(owner, request);
     },
@@ -299,8 +311,8 @@ function myItemKind(kind: string): MyItem["kind"] {
 }
 
 export class PastedLinkError extends Error {
-  constructor() {
-    super("That is not a Done When link. Paste a share link, an owner link or a token.");
+  constructor(message = "That is not a Done When link. Paste a share link, an owner link or a token.") {
+    super(message);
     this.name = "PastedLinkError";
   }
 }

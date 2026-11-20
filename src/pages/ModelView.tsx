@@ -1,7 +1,8 @@
 import { MeasureNextPanel, ModelCalculator, ModelEditor, QuantityHistogram, SensitivityView } from "@haakco/custd-react";
-import { APP_MODEL_FORECAST_FIELDS, APP_MODEL_QUANTITY_KINDS, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
+import { APP_MODEL_FORECAST_FIELDS, APP_MODEL_INPUT_SHAPES, APP_MODEL_QUANTITY_KINDS, APP_MODEL_SOURCE_KINDS, type AppModelForecastField, type AppModelQuantityResult, type AppModelRun } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { useNavigate } from "react-router";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { ImportPanel } from "../components/ImportPanel";
 import { ItemHeader } from "../components/ItemHeader";
@@ -12,6 +13,7 @@ import type { DoneWhenData, ItemAccess, Model } from "../data";
 import { modelOf, useModelRun } from "../data/live";
 import { formatDate } from "../lib/dates";
 import { modelWorkbook } from "../lib/exports";
+import { ownerPath } from "../lib/links";
 import { mergeQuantities, parseQuantityTable } from "../lib/imports";
 import type { Table } from "../lib/table";
 import type { ItemViewProps } from "./view-props";
@@ -86,11 +88,12 @@ function ModelResults({ model, run, outputs }: { model: Model; run: AppModelRun 
   }
   const currentVersion = run.versionNumber === model.latestVersion;
   const results = (run.quantities ?? []).filter((result) => !currentVersion || outputs.length === 0 || outputs.includes(result.name));
+  const mainResult = results.find((result) => result.name === run.sensitivityOutput) ?? results[0];
   const units = new Map((currentVersion ? model.version?.quantities ?? [] : []).map((quantity) => [quantity.name, quantity.unit ?? ""]));
   return (
     <>
       <section className="summary" aria-label="Summary">
-        <p className="summary__headline">{headline(results[0], units)}</p>
+        <p className="summary__headline">{headline(mainResult, units)}</p>
         <p className="summary__detail small">
           From {run.sampleCount.toLocaleString("en")} simulated trials of version {run.versionNumber}, {formatDate(run.createdAt)}.
         </p>
@@ -163,6 +166,11 @@ function RunButton({ data, access, outputs }: { data: DoneWhenData; access: Item
 }
 
 function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: ItemAccess; model: Model }) {
+  const navigate = useNavigate();
+  const copy = useMutation({
+    mutationFn: () => data.copyModel(access),
+    onSuccess: (created) => { void navigate(ownerPath("model", created.ownerToken)); },
+  });
   return (
     <section className="section owner-tools" aria-labelledby="owner-heading">
       <h2 id="owner-heading">Owner tools</h2>
@@ -176,6 +184,15 @@ function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: 
           />
         </div>
       </details>
+      {modelInputs(model).length > 0 ? <CounterBinding key={model.latestVersion} data={data} access={access} model={model} /> : null}
+      {model.version ? (
+        <div className="button-row">
+          <button type="button" className="button" disabled={copy.isPending} onClick={() => { copy.mutate(); }}>
+            {copy.isPending ? "Copying…" : "Copy model"}
+          </button>
+          <WriteError error={copy.error} />
+        </div>
+      ) : null}
       <details className="more">
         <summary>Import quantities</summary>
         <div className="more__body">
@@ -190,6 +207,57 @@ function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: 
         </div>
       </details>
     </section>
+  );
+}
+
+function CounterBinding({ data, access, model }: { data: DoneWhenData; access: ItemAccess; model: Model }) {
+  const save = useMutation({
+    mutationFn: async ({ name, link, field }: { name: string; link: string; field: AppModelForecastField }) => {
+      const projectUuid = await data.readCounterForecastSource(link);
+      const quantities = (model.version?.quantities ?? []).map((quantity) =>
+        quantity.name === name && quantity.kind === APP_MODEL_QUANTITY_KINDS.input
+          ? {
+            ...quantity,
+            input: {
+              shape: APP_MODEL_INPUT_SHAPES.bound,
+              source: { kind: APP_MODEL_SOURCE_KINDS.counterForecast, projectUuid, field },
+            },
+          }
+          : quantity,
+      );
+      await data.saveModelVersion(access, { quantities });
+    },
+  });
+
+  return (
+    <details className="more">
+      <summary>Link a counter forecast</summary>
+      <form className="more__body" onSubmit={(event) => {
+        event.preventDefault();
+        const fields = new FormData(event.currentTarget);
+        const field = Object.values(APP_MODEL_FORECAST_FIELDS).find((value) => value === fields.get("field"));
+        if (field) save.mutate({ name: String(fields.get("quantity")), link: String(fields.get("link")), field });
+      }}>
+        <label className="field">
+          Input quantity
+          <select name="quantity">{modelInputs(model).map((name) => <option key={name}>{name}</option>)}</select>
+        </label>
+        <label className="field">
+          Counter link
+          <input name="link" required autoComplete="off" />
+        </label>
+        <label className="field">
+          Forecast value
+          <select name="field">
+            {Object.values(APP_MODEL_FORECAST_FIELDS).map((field) => <option key={field} value={field}>{forecastFieldLabels[field]}</option>)}
+          </select>
+        </label>
+        <button type="submit" className="button" disabled={save.isPending}>
+          {save.isPending ? "Saving…" : "Save linked input"}
+        </button>
+        <WriteError error={save.error} />
+      </form>
+    </details>
   );
 }
 

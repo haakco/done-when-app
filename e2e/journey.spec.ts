@@ -154,6 +154,7 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
   await expect(page.getByText("Version 1")).toBeVisible();
   await page.getByRole("button", { name: "Run model" }).click();
   await expect(page.getByText("total: about 22.5")).toBeVisible();
+  const modelOwnerUrl = page.url();
   const shareUrl = await copyShareUrl(page);
   const viewer = await browser.newContext();
   try {
@@ -172,6 +173,25 @@ test("an owner runs a model and shares the results with a viewer and dashboard",
   await page.getByRole("button", { name: "Create dashboard" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "Monthly cost" })).toBeVisible();
   await expect(page.getByText(/total: about 22\.5/)).toBeVisible();
+
+  await createCounter(page, "Pages read", "100", HISTORY);
+  const counterLink = await copyShareUrl(page);
+
+  await page.goto(modelOwnerUrl);
+  await page.getByText("Link a counter forecast", { exact: true }).click();
+  await page.getByLabel("Input quantity").selectOption("rate");
+  await page.getByLabel("Counter link").fill(counterLink);
+  await page.getByLabel("Forecast value").selectOption("rate_per_day");
+  const versionRequest = page.waitForRequest((request) =>
+    request.method() === "POST" && request.url().endsWith("/api/v1/app/item/model/versions"));
+  await page.getByRole("button", { name: "Save linked input" }).click();
+  expect((await versionRequest).postDataJSON().quantities).toContainEqual({
+    name: "rate",
+    kind: "input",
+    input: { shape: "bound", source: { kind: "counter_forecast", projectUuid: expect.any(String), field: "rate_per_day" } },
+  });
+  await expect(page.getByText("Version 2", { exact: true })).toBeVisible();
+  await expect(page.getByText("total: about 22.5")).toBeVisible();
 });
 
 test("the landing forecast can be tried on a phone without creating an item", async ({ page, fake }) => {
