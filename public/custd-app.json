@@ -108,7 +108,7 @@
       "kind": "uncertainty_model",
       "cardTemplate": "share-cards/model.svg",
       "title": "{{name}}",
-      "description": "Explore the model and its latest results in Done When."
+      "description": "{{resultRange}}"
     },
     {
       "route": "/d/*",
