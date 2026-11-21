@@ -15,7 +15,7 @@ export type DoneWhenState =
 const CUSTOM_EVENT = "custom-event";
 
 function dataFor(app: HostedApp): DoneWhenData | null {
-  return app.appItems ? createDoneWhenData(app.appItems, (event) => { void app.trackAppEvent(CUSTOM_EVENT, { name: event }); }) : null;
+  return app.appItems ? createDoneWhenData(app.appItems, (event) => { void app.trackAppEvent(CUSTOM_EVENT, { name: event, tag: event }); }) : null;
 }
 
 /** The app's data, once the hosted app has read its discovery file. */
