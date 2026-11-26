@@ -1,5 +1,5 @@
 import type { BrowserSignIn, SignInState } from "@haakco/custd-sdk";
-import { SIGN_IN_ERROR_CODES, SIGN_IN_STATUSES } from "@haakco/custd-sdk";
+import { appAccountNavigation, SIGN_IN_ERROR_CODES, SIGN_IN_STATUSES } from "@haakco/custd-sdk";
 import { useCallback, useSyncExternalStore } from "react";
 import { useDoneWhen } from "../data";
 
@@ -9,6 +9,8 @@ export type SessionView = {
   signedIn: boolean;
   pending: boolean;
   failure: string | null;
+  /** Custd's account settings page for this app's issuer; null when the issuer is not HTTPS. */
+  accountSettingsUrl: string | null;
   signIn: (returnTo?: string) => void;
   signOut: () => void;
 };
@@ -33,6 +35,15 @@ function failureMessage(state: SignInState): string | null {
   }
 }
 
+function accountSettingsUrl(issuer: string | undefined): string | null {
+  if (!issuer) return null;
+  try {
+    return appAccountNavigation({ issuer, applicationHome: window.location.origin }).settingsUrl;
+  } catch {
+    return null;
+  }
+}
+
 /** The signed-in state, or a signed-out one when sign-in is unavailable. */
 export function useSession(): SessionView {
   const state = useDoneWhen();
@@ -40,11 +51,13 @@ export function useSession(): SessionView {
   const subscribe = useCallback((listener: () => void) => (client ? client.subscribe(listener) : noSubscribe()), [client]);
   const getState = useCallback(() => (client ? client.getState() : SIGNED_OUT), [client]);
   const signInState = useSyncExternalStore(subscribe, getState, getState);
+  const issuer = state.status === "ready" ? state.app.discovery.signIn?.issuer : undefined;
   return {
     available: client !== null,
     signedIn: signInState.status === SIGN_IN_STATUSES.signedIn,
     pending: signInState.status === SIGN_IN_STATUSES.signingIn,
     failure: failureMessage(signInState),
+    accountSettingsUrl: accountSettingsUrl(issuer),
     signIn: (returnTo) => {
       void client?.signIn({ returnTo: returnTo ?? here() }).catch(() => undefined);
     },

@@ -66,17 +66,27 @@ function BigScreenLayout() {
 function AccountLink() {
   const session = useSession();
   if (!session.available) return null;
-  return (
-    <li>
-      {session.signedIn ? (
-        <button type="button" className="link-button" onClick={session.signOut}>
-          Sign out
-        </button>
-      ) : (
+  if (!session.signedIn) {
+    return (
+      <li>
         <button type="button" className="link-button" disabled={session.pending} onClick={() => { session.signIn(); }}>
           Sign in
         </button>
+      </li>
+    );
+  }
+  return (
+    <>
+      {session.accountSettingsUrl && (
+        <li>
+          <a href={session.accountSettingsUrl}>Account settings</a>
+        </li>
       )}
-    </li>
+      <li>
+        <button type="button" className="link-button" onClick={session.signOut}>
+          Sign out
+        </button>
+      </li>
+    </>
   );
 }
