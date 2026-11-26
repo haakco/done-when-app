@@ -15,11 +15,9 @@ type RoutingRules = {
 };
 
 /**
- * Card fields Custd's share previews fill (services/app-delivery/internal/preview/item_read.go),
- * plus `percent`, which the counter card's progress bar asks for and Custd does not send yet: the
- * bar then shows empty.
+ * Card fields Custd's share previews fill (services/app-delivery/internal/preview/item_read.go).
  */
-const ITEM_FIELDS = new Set(["name", "description", "unit", "target", "deliveryTarget", "estimateLow", "estimateHigh", "chance", "itemCount", "percent"]);
+const ITEM_FIELDS = new Set(["name", "description", "unit", "target", "deliveryTarget", "estimateLow", "estimateHigh", "chance", "itemCount", "percent", "quantityCount", "resultRange"]);
 const SITE_FIELDS = new Set(["title", "description"]);
 const FIELD = /\{\{\s*([A-Za-z][A-Za-z0-9_.-]*)\s*\}\}/g;
 
@@ -41,7 +39,7 @@ describe("custd-app.json routing rules", () => {
       expect(inRelease(file), file).toBe(true);
     }
     for (const { prefix } of rules.spaFallbacks) {
-      expect(prefix).toMatch(/^\/[a-z]+\/$/);
+      expect(prefix).toMatch(/^(\/[a-z]+)+\/$/);
     }
     expect(rules.cache).toEqual([{ match: "assets/**", mode: "immutable" }]);
   });
@@ -50,6 +48,7 @@ describe("custd-app.json routing rules", () => {
     expect(rules.shareableRoutes.map(({ route, kind }) => [route, kind])).toEqual([
       ["/c/*", "measurement_project"],
       ["/p/*", "measurement_project"],
+      ["/m/*", "uncertainty_model"],
       ["/d/*", "link_collection"],
     ]);
     for (const card of [...rules.shareableRoutes, rules.siteCard]) {
@@ -73,7 +72,7 @@ describe("custd-app.json routing rules", () => {
 describe("share card templates", () => {
   it("has a 1200×630 template for each item kind and the site", () => {
     const cards = readdirSync(resolve(root, "public/share-cards")).sort();
-    expect(cards).toEqual(["counter.svg", "dashboard.svg", "project.svg", "site.svg"]);
+    expect(cards).toEqual(["counter.svg", "dashboard.svg", "model.svg", "project.svg", "site.svg"]);
     for (const card of cards) {
       expect(template(`share-cards/${card}`), card).toContain('width="1200" height="630"');
     }
