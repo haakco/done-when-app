@@ -1,3 +1,4 @@
+import { CustdAccountMenuItem } from "@haakco/custd-react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { TV_PARAM, useTvMode } from "../lib/use-motion";
 import { CelebrationsToggle } from "./Moments";
@@ -77,9 +78,18 @@ function AccountLink() {
   }
   return (
     <>
-      {session.accountSettingsUrl && (
+      {session.account && (
         <li>
-          <a href={session.accountSettingsUrl}>Account settings</a>
+          <CustdAccountMenuItem
+            className="link-button"
+            issuer={session.account.issuer}
+            accessToken={session.account.accessToken}
+            returnPath="/mine"
+            onError={() => {
+              // Still reach settings when the issuer refuses a ticket; only the link back is lost.
+              if (session.account) window.location.assign(new URL("/settings", session.account.issuer));
+            }}
+          />
         </li>
       )}
       <li>
