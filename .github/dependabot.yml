@@ -1,0 +1,24 @@
+# Custd SDK bump pull requests for the Rust CLI: one per SDK release, found by
+# the weekly run after it is tagged. Dependabot moves the `tag = "vX"` git pin to the newest
+# version tag.
+#
+# `target-branch: main` keeps this entry's `allow` list off security updates.
+# Without it, Dependabot applies `allow` to security updates too, and the crates
+# other than the SDK would get no security pull requests.
+#
+# The JS packages pin the SDK as `github:haakco/custd-sdk#vX&path:/sdk-js`.
+# Dependabot reads the whole fragment as one ref, which never looks like a
+# version tag, so it cannot bump those pins; they are bumped by hand.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /cli
+    target-branch: main
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: custd-sdk
+    cooldown:
+      exclude:
+        - custd-sdk
+    open-pull-requests-limit: 2
