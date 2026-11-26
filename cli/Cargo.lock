@@ -231,8 +231,8 @@ dependencies = [
 
 [[package]]
 name = "custd-sdk"
-version = "3.64.3"
-source = "git+https://github.com/haakco/custd-sdk?tag=v3.64.3#bdefddaa9743ae0a0177524ec2a90b3b38cfd620"
+version = "3.66.0"
+source = "git+https://github.com/haakco/custd-sdk?tag=v3.66.0#8642f02973c8584a22140636fcaf6cbc5a584b44"
 dependencies = [
  "base64",
  "ring",

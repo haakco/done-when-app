@@ -131,7 +131,8 @@ pub const OPERATIONS: &[(&str, Coverage)] = &[
 ];
 
 /// Public SDK functions that build clients rather than call the API. `with_user_token` is
-/// applied to every app client while a session is valid; `owned_item` reaches "my items".
+/// applied to every app client while a session is valid; `owned_item` reaches "my items";
+/// `with_acting_company` names a tenant for system-administrator cleanup jobs.
 pub const NOT_OPERATIONS: &[&str] = &[
     "BrowserLogin::new",
     "AppClient::new",
@@ -140,4 +141,5 @@ pub const NOT_OPERATIONS: &[&str] = &[
     "AppClient::link",
     "AppClient::owned_item",
     "CustdClient::new",
+    "CustdClient::with_acting_company",
 ];
