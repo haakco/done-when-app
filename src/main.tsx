@@ -18,11 +18,16 @@ const queryClient = new QueryClient({
   },
 });
 
+// One session per browser, not per tab: a member who signed in stays signed in when Done When opens in
+// another tab or after the browser restarts. Sign-out clears it for every tab.
+const HOSTED_APP_OPTIONS = { signInStorage: window.localStorage };
+
 /** Starts the hosted app once; a finished sign-in returns to the page it began on. */
 function HostedApp({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   return (
     <CustdHostedAppProvider
+      options={HOSTED_APP_OPTIONS}
       onSignInComplete={(returnTo) => {
         void navigate(returnTo, { replace: true });
       }}

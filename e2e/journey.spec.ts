@@ -381,3 +381,13 @@ test("one shared workspace follows a counter, a project estimate and a meeting",
     await viewer.close();
   }
 });
+
+test("a signed-in member stays signed in when Done When opens in a new tab", async ({ page, context }) => {
+  await page.goto("/mine");
+  await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+
+  const second = await context.newPage();
+  await second.goto("/mine");
+  await expect(second.getByRole("button", { name: "Sign out" })).toBeVisible();
+});
