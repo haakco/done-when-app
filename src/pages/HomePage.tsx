@@ -1,6 +1,6 @@
 import { parseModelValue } from "@haakco/custd-react";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { CounterForm } from "../components/CounterForm";
 import { ForecastExample } from "../components/ForecastExample";
@@ -15,6 +15,7 @@ import { DEFAULT_EXPIRY_SECONDS } from "../lib/expiry";
 import { ownerPath } from "../lib/links";
 
 export function HomePage() {
+  const counter = useRef<HTMLElement>(null);
   return (
     <>
       <h1 className="hero home-hero">See when it will be done.</h1>
@@ -22,51 +23,60 @@ export function HomePage() {
       <section aria-label="Planning and meetings">
         <ul className="card-grid">
           <li className="card">
-            <h2>Build a plan</h2>
+            <h2>Plan</h2>
             <p>Connect tasks and forecast when the whole project could finish.</p>
             <div className="button-row">
-              <Link className="button" to="/examples/plan">Try the launch plan</Link>
-              <Link to="/new/plan">Start a plan</Link>
+              <Link className="button button--primary" to="/new/plan">Start a plan</Link>
+              <Link to="/examples/plan">Try the launch plan</Link>
             </div>
           </li>
           <li className="card">
-            <h2>Run a meeting</h2>
+            <h2>Meeting</h2>
             <p>Run a timed agenda and see how early finishes and overruns affect the next item.</p>
             <div className="button-row">
-              <Link className="button" to="/examples/meeting">Try a sample meeting</Link>
-              <Link to="/new/meeting">Start a meeting</Link>
+              <Link className="button button--primary" to="/new/meeting">Start a meeting</Link>
+              <Link to="/examples/meeting">Try a sample meeting</Link>
             </div>
           </li>
         </ul>
-        <p><Link to="/examples/dashboard">See the sample dashboard</Link></p>
       </section>
       <div className="home-start">
-        <section className="card card--lead" aria-labelledby="start-heading">
+        <section ref={counter} tabIndex={-1} className="card card--lead" aria-labelledby="start-heading" id="start-counter">
           <h2 id="start-heading">Start a counter</h2>
+          <p>Measure progress towards a number.</p>
           <WithData>{({ data }) => <CounterForm data={data} />}</WithData>
         </section>
-        <ForecastExample />
+        <ForecastExample onStart={() => {
+          (counter.current?.querySelector<HTMLInputElement>("input") ?? counter.current)?.focus();
+        }} />
       </div>
       <section className="section" aria-labelledby="other-heading">
-        <h2 id="other-heading">Plan and manage your work</h2>
+        <h2 id="other-heading">Estimates, models and dashboards</h2>
         <ul className="card-grid">
           <li className="card">
-            <h3>
-              <Link to="/new/project">Track a project</Link>
-            </h3>
-            <p className="muted small">For a site launch, start with Dec 8–15 and narrow the estimate once testing is scheduled.</p>
+            <h3>Project estimate</h3>
+            <p>Track one finish-date range and refine it as you learn more.</p>
+            <div className="button-row">
+              <Link className="button button--primary" to="/new/project">Start a project estimate</Link>
+              <Link to="/examples/project">Try a project estimate</Link>
+            </div>
           </li>
           <li className="card">
-            <h3>
-              <Link to="/new/model">Build a model</Link>
-            </h3>
+            <h3>Model</h3>
+            <p>See how uncertain inputs affect a result, like a budget or a quantity.</p>
+            <div className="button-row">
+              <Link className="button button--primary" to="/new/model">Build a model</Link>
+              <Link to="/examples/model">Try a model</Link>
+            </div>
             <WithData>{({ data }) => <QuickModelForm data={data} />}</WithData>
           </li>
           <li className="card">
-            <h3>
-              <Link to="/new/dashboard">Make a dashboard</Link>
-            </h3>
-            <p className="muted small">Put counters, projects, models and meetings on one screen that updates itself.</p>
+            <h3>Dashboard</h3>
+            <p>See several items on one live screen.</p>
+            <div className="button-row">
+              <Link className="button button--primary" to="/new/dashboard">Make a dashboard</Link>
+              <Link to="/examples/dashboard">See the sample dashboard</Link>
+            </div>
           </li>
         </ul>
       </section>

@@ -14,9 +14,10 @@ type Props = { data: DoneWhenData; access: ItemAccess; kind: ItemKind; meta: Ite
 
 /** The share and owner links, replacing the share link, and the idle-expiry window. */
 export function LinksAndExpiry({ data, access, kind, meta }: Props) {
-  const shareToken = useShareToken(meta.itemUuid);
+  const savedShareToken = useShareToken(meta.itemUuid);
   const shareLink = meta.links.find((link) => link.role === APP_LINK_ROLES.share);
   const replace = useMutation({ mutationFn: (linkUuid: string) => data.replaceShareLink(access, meta.itemUuid, linkUuid) });
+  const shareToken = replace.data ?? shareLink?.shareToken ?? savedShareToken;
   const [expiry, setExpiry] = useState(meta.idleExpirySeconds);
   const save = useMutation({ mutationFn: (seconds: number) => data.setExpiry(access, seconds) });
   return (
@@ -26,7 +27,7 @@ export function LinksAndExpiry({ data, access, kind, meta }: Props) {
         {shareToken ? (
           <CopyButton label="Copy view-only link" text={absoluteUrl(sharePath(kind, shareToken))} />
         ) : (
-          <p className="small muted">This browser does not have it. Share above makes a new one.</p>
+          <p className="small muted">This browser has no copy of the link. If you need a new link, you can replace it below.</p>
         )}
         {shareLink ? (
           <details className="quiet-details">

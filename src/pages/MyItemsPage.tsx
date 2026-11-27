@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Link } from "react-router";
 import { WriteError } from "../components/ItemStates";
-import { RecentList } from "../components/RecentList";
+import { KIND_LABEL, RecentList } from "../components/RecentList";
 import { useSession } from "../components/Session";
 import { WithData } from "../components/WithData";
 import type { DoneWhenData } from "../data";
@@ -15,9 +15,10 @@ export function MyItemsPage() {
       <h1>My items</h1>
       <nav className="button-row" aria-label="Create workspace items">
         <Link className="button" to="/new/counter">New counter</Link>
-        <Link className="button" to="/new/project">New project</Link>
+        <Link className="button" to="/new/project">New project estimate</Link>
         <Link className="button" to="/new/meeting">New meeting</Link>
         <Link className="button" to="/new/plan">New plan</Link>
+        <Link className="button" to="/new/model">New model</Link>
         <Link className="button" to="/new/dashboard">New dashboard</Link>
       </nav>
       <WithData>{({ data }) => <MyItems data={data} />}</WithData>
@@ -55,26 +56,28 @@ function ItemList({ data }: { data: DoneWhenData }) {
   const listed = useMemo(() => new Set((items.data ?? []).map((item) => item.itemUuid)), [items.data]);
   if (items.isPending) return <p role="status" className="muted">Loading your items…</p>;
   if (items.isError) return <WriteError error={items.error} />;
-  if (items.data.length === 0) {
-    return (
-      <p className="notice">
-        Nothing here yet. <Link to="/">Start a counter</Link>, or open an owner link and choose &ldquo;Add to my items&rdquo;.
-      </p>
-    );
-  }
   return (
     <>
-    <ul className="item-list">
-      {items.data.map((item) => (
-        <li key={item.itemUuid} className="card row-between">
-          <Link to={ownedItemPath(item.kind === "item" ? "counter" : item.kind, item.itemUuid)}>{item.name || "Dashboard"}</Link>
-          <span className="small muted">
-            {item.status ? `${item.status} · ` : ""}updated {formatDate(item.updatedAt)}
-          </span>
-        </li>
-      ))}
-    </ul>
-    <RecentList heading="Also opened on this device" exclude={listed} />
+      {items.data.length === 0 ? (
+        <p className="notice">
+          No items in your account yet. Create one above, or open a recent item below and choose &ldquo;Add to my items&rdquo;.
+        </p>
+      ) : (
+        <ul className="item-list">
+          {items.data.map((item) => {
+            const kind = item.kind === "item" ? "counter" : item.kind;
+            return (
+              <li key={item.itemUuid} className="card row-between">
+                <Link to={ownedItemPath(kind, item.itemUuid)}>{item.name || KIND_LABEL[kind]}</Link>
+                <span className="small muted">
+                  {KIND_LABEL[kind]} · {item.status ? `${item.status} · ` : ""}updated {formatDate(item.updatedAt)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <RecentList heading={items.data.length === 0 ? "Recent on this device" : "Also opened on this device"} exclude={listed} />
     </>
   );
 }

@@ -15,7 +15,7 @@ const day = (date: number) => Date.UTC(2026, 10, date);
 const initialDates = { median: day(16), low: day(14), high: day(20) };
 const updatedDates = { median: day(13), low: day(12), high: day(16) };
 
-export function ForecastExample() {
+export function ForecastExample({ onStart }: { onStart: () => void }) {
   const [added, setAdded] = useState(false);
   const dates = added ? updatedDates : initialDates;
   const { shown, moving, announcement } = useGlidingForecast(dates);
@@ -33,6 +33,10 @@ export function ForecastExample() {
         {added ? "Reset example" : "Try adding 24 pages"}
       </button>
       <ForecastMove text={added ? announcement : ""} />
+      {added ? (
+        <p className="small">37 → 61 pages. Likely finish moved from {formatShortDate(initialDates.median)} to {formatShortDate(updatedDates.median)}. The 90% range narrowed from {formatShortDate(initialDates.low)}–{formatShortDate(initialDates.high)} to {formatShortDate(updatedDates.low)}–{formatShortDate(updatedDates.high)}.</p>
+      ) : null}
+      <button type="button" className="button button--quiet" onClick={onStart}>Track my own target</button>
       <figure className="chart forecast-example__chart" aria-label="Example forecast" data-forecast-motion={moving ? "moving" : "still"}>
         <ForecastChart
           data={{ observations: rows, target: TARGET, completionMedian: median, completionInterval: range }}
