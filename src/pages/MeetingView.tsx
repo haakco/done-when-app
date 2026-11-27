@@ -41,8 +41,8 @@ export function MeetingView({ data, access, read, live, showOwnerTools, ownerRou
       </ItemHeader>
       {meeting.status === APP_MEETING_STATUSES.ready ? <ReadySummary meeting={meeting} data={data} access={access} owner={showOwnerTools} /> : null}
       {running && agenda.current ? <NowSummary meeting={meeting} current={agenda.current} agenda={agenda} data={data} access={access} owner={showOwnerTools} refresh={live.refresh} /> : null}
-      {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? <Outcome meeting={meeting} /> : null}
-      {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? null : <Agenda agenda={agenda} running={running} />}
+      {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? <MeetingOutcomeView meeting={meeting} /> : null}
+      {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? null : <MeetingAgenda agenda={agenda} running={running} />}
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
       {showOwnerTools ? <MeetingMinutes saved={read.meetingMinutes} revision={read.item.version} save={async (update) => {
         await data.updateMeetingMinutes(access, update);
@@ -200,7 +200,7 @@ function StepButtons({ data, access, blockUuid, nextTitle, refresh }: StepButton
   );
 }
 
-function Agenda({ agenda, running }: { agenda: LiveAgenda; running: boolean }) {
+export function MeetingAgenda({ agenda, running }: { agenda: LiveAgenda; running: boolean }) {
   return (
     <section className="section" aria-labelledby="agenda-heading">
       <h2 id="agenda-heading">{running ? "Rest of the agenda" : "Agenda"}</h2>
@@ -249,7 +249,7 @@ function Agenda({ agenda, running }: { agenda: LiveAgenda; running: boolean }) {
   );
 }
 
-function Outcome({ meeting }: { meeting: AppMeeting }) {
+export function MeetingOutcomeView({ meeting }: { meeting: AppMeeting }) {
   const outcome = meetingOutcome(meeting);
   return (
     <>
