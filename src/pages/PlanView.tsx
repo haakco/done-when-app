@@ -93,7 +93,7 @@ function PlanContent({ data, access, read, live, showOwnerTools, plan }: ItemVie
             <PlanProgress forecast={result} deadline={plan.deadline} />
             {result.requiredParts > 0 ? (
               <p className="small muted">
-                Forecast as of <time dateTime={result.asOf}>{dateLabel(result.asOf)}</time>. Assumes each part’s estimate is independent.
+                Forecast as of <time dateTime={result.asOf}>{dateLabel(result.asOf)}</time>. Assumes each part’s estimate is independent. <a href="/help/forecasting#plans">How plan forecasts work</a>.
               </p>
             ) : null}
           </>

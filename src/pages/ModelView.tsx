@@ -244,6 +244,7 @@ function ModelOwnerTools({ data, access, model }: { data: DoneWhenData; access: 
       <details className="more" open={model.latestVersion === 0}>
         <summary>Edit quantities</summary>
         <div className="more__body">
+          <p className="small muted"><a href="/help/forecasting#models">Choose input types and range shapes</a>.</p>
           <ModelEditor
             key={model.latestVersion}
             quantities={model.version?.quantities ?? []}
@@ -315,6 +316,7 @@ function CounterBinding({ data, access, model }: { data: DoneWhenData; access: I
         const link = fields.get("link");
         if (field && typeof name === "string" && typeof link === "string") save.mutate({ name, link, field });
       }}>
+        <p className="small muted"><a href="/help/forecasting#models">Understand linked forecast values</a>.</p>
         <label className="field">
           Input quantity
           <select name="quantity">{modelInputs(model).map((name) => <option key={name}>{name}</option>)}</select>

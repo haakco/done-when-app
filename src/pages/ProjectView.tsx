@@ -122,7 +122,7 @@ function EstimateForm({ data, access }: { data: DoneWhenData; access: ItemAccess
   return (
     <section className="card section" aria-labelledby="estimate-heading">
       <h2 id="estimate-heading">Add an estimate</h2>
-      <p className="small muted">Pick dates you are 90% sure it lands between.</p>
+      <p className="small muted">Pick dates you are 90% sure it lands between. <a href="/help/forecasting#projects">How the date range works</a>.</p>
       <form
         className="form"
         onSubmit={(event) => {
