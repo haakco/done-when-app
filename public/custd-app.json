@@ -3,6 +3,14 @@
   "notFoundPage": "404.html",
   "spaFallbacks": [
     {
+      "prefix": "/examples/",
+      "file": "index.html"
+    },
+    {
+      "prefix": "/help/",
+      "file": "index.html"
+    },
+    {
       "prefix": "/new/",
       "file": "index.html"
     },

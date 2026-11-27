@@ -1,6 +1,6 @@
 import { parseModelValue } from "@haakco/custd-react";
 import { useMutation } from "@tanstack/react-query";
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { CounterForm } from "../components/CounterForm";
 import { ForecastExample } from "../components/ForecastExample";
@@ -14,14 +14,32 @@ import type { DoneWhenData, ModelDraft } from "../data";
 import { DEFAULT_EXPIRY_SECONDS } from "../lib/expiry";
 import { ownerPath } from "../lib/links";
 
-const PlanExample = lazy(() => import("./PlanExample"));
-
 export function HomePage() {
-  const [exampleOpen, setExampleOpen] = useState(false);
   return (
     <>
       <h1 className="hero home-hero">See when it will be done.</h1>
       <p className="lede">Plan projects, forecast progress and run meetings. Share the whole picture from one dashboard.</p>
+      <section aria-label="Planning and meetings">
+        <ul className="card-grid">
+          <li className="card">
+            <h2>Build a plan</h2>
+            <p>Connect tasks and forecast when the whole project could finish.</p>
+            <div className="button-row">
+              <Link className="button" to="/examples/plan">Try the launch plan</Link>
+              <Link to="/new/plan">Start a plan</Link>
+            </div>
+          </li>
+          <li className="card">
+            <h2>Run a meeting</h2>
+            <p>Run a timed agenda and see how early finishes and overruns affect the next item.</p>
+            <div className="button-row">
+              <Link className="button" to="/examples/meeting">Try a sample meeting</Link>
+              <Link to="/new/meeting">Start a meeting</Link>
+            </div>
+          </li>
+        </ul>
+        <p><Link to="/examples/dashboard">See the sample dashboard</Link></p>
+      </section>
       <div className="home-start">
         <section className="card card--lead" aria-labelledby="start-heading">
           <h2 id="start-heading">Start a counter</h2>
@@ -29,10 +47,6 @@ export function HomePage() {
         </section>
         <ForecastExample />
       </div>
-      <details className="more section" onToggle={(event) => { setExampleOpen(event.currentTarget.open); }}>
-        <summary>Try the launch plan</summary>
-        {exampleOpen ? <Suspense fallback={<p role="status">Loading example…</p>}><PlanExample /></Suspense> : null}
-      </details>
       <section className="section" aria-labelledby="other-heading">
         <h2 id="other-heading">Plan and manage your work</h2>
         <ul className="card-grid">
@@ -40,25 +54,13 @@ export function HomePage() {
             <h3>
               <Link to="/new/project">Track a project</Link>
             </h3>
-            <p className="muted small">Record low and high dates and watch them close in on the day it lands.</p>
+            <p className="muted small">For a site launch, start with Dec 8–15 and narrow the estimate once testing is scheduled.</p>
           </li>
           <li className="card">
             <h3>
               <Link to="/new/model">Build a model</Link>
             </h3>
             <WithData>{({ data }) => <QuickModelForm data={data} />}</WithData>
-          </li>
-          <li className="card">
-            <h3>
-              <Link to="/new/meeting">Run a meeting</Link>
-            </h3>
-            <p className="muted small">Give each part of the agenda a time, run it live, and see planned against actual.</p>
-          </li>
-          <li className="card">
-            <h3>
-              <Link to="/new/plan">Build a plan</Link>
-            </h3>
-            <p className="muted small">Connect work that depends on other parts and see when the whole plan could finish.</p>
           </li>
           <li className="card">
             <h3>
@@ -107,7 +109,7 @@ function QuickModelForm({ data }: { data: DoneWhenData }) {
         quantities: [{ name: "estimate", ...parsed.value }],
       });
     }}>
-      <Field label="Start with one estimate" hint="For example: Monthly cost: 500 to 800" error={error}>
+      <Field label="Start with one estimate" hint="For example: Launch materials: 500 to 800" error={error}>
         {(control) => <input {...control} name="model" required onChange={() => { setError(""); }} />}
       </Field>
       <button type="submit" className="button" disabled={create.isPending}>

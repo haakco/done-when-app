@@ -6,7 +6,7 @@ const MINUTE = 60_000;
 /** Builds Check-in 5, Planning 10, Demo 10, then moves Demo above Planning by keyboard. */
 async function buildAgenda(page: Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("link", { name: "Run a meeting" }).click();
+  await page.getByRole("link", { name: "Start a meeting" }).click();
   await page.getByLabel("Meeting name").fill("Weekly sync");
   for (const [index, [title, minutes]] of [["Check-in", "5"], ["Planning", "10"], ["Demo", "10"]].entries()) {
     if (index > 0) await page.getByRole("button", { name: "Add block" }).click();

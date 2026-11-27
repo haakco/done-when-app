@@ -1,5 +1,6 @@
+import { lazy, Suspense } from "react";
 import { NewPlanPage } from "./pages/NewPlanPage";
-import { Route, Routes } from "react-router";
+import { Outlet, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { ApiPage } from "./pages/ApiPage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
@@ -13,6 +14,11 @@ import { NewModelPage } from "./pages/NewModelPage";
 import { NewProjectPage } from "./pages/NewProjectPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
+const PlanExample = lazy(() => import("./pages/PlanExample"));
+const MeetingExample = lazy(() => import("./pages/MeetingExample"));
+const DashboardExample = lazy(() => import("./pages/DashboardExample"));
+const ForecastingGuide = lazy(() => import("./pages/ForecastingGuide").then(({ ForecastingGuide }) => ({ default: ForecastingGuide })));
+
 /** Every app route. Keep public/custd-app.json's SPA fallbacks and shareable routes in step. */
 export function App() {
   return (
@@ -20,6 +26,14 @@ export function App() {
       <Route path="embed/model/:token" element={<ModelEmbedPage />} />
       <Route element={<Layout />}>
         <Route index element={<HomePage />} />
+        <Route path="examples" element={<Suspense fallback={<p role="status">Loading example…</p>}>
+          <Outlet />
+        </Suspense>}>
+          <Route path="plan" element={<PlanExample />} />
+          <Route path="meeting" element={<MeetingExample />} />
+          <Route path="dashboard" element={<DashboardExample />} />
+        </Route>
+        <Route path="help/forecasting" element={<Suspense fallback={<p role="status">Loading guide…</p>}><ForecastingGuide /></Suspense>} />
         <Route path="new/counter" element={<NewCounterPage />} />
         <Route path="new/project" element={<NewProjectPage />} />
         <Route path="new/model" element={<NewModelPage />} />
