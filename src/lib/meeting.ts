@@ -3,7 +3,15 @@
 // its extra time from the blocks after it in proportion to their length, as Custd's run engine
 // does, so the agenda on screen matches what the next read will say.
 
-import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES, type AppMeeting, type AppMeetingBlock } from "@haakco/custd-sdk/browser";
+import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES, type AppMeeting as SdkMeeting, type AppMeetingBlock as SdkMeetingBlock } from "@haakco/custd-sdk/browser";
+
+export type MeetingAdjustment = {
+  blockUuid: string;
+  changes: { blockUuid: string; beforeMs: number; afterMs: number }[];
+};
+
+export type AppMeetingBlock = SdkMeetingBlock & { allocatedAtStartMs?: number };
+export type AppMeeting = Omit<SdkMeeting, "blocks"> & { blocks: AppMeetingBlock[] | null; adjustments?: MeetingAdjustment[] };
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -70,6 +78,26 @@ export function formatClock(ms: number): string {
   const m = Math.floor((seconds % 3600) / 60);
   const s = String(seconds % 60).padStart(2, "0");
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
+export type ClockPhase = "remaining" | "near" | "zero" | "over";
+
+export function clockPhase(current: CurrentBlock): ClockPhase {
+  if (current.overMs > 0) return "over";
+  if (current.leftMs === 0) return "zero";
+  return current.leftMs <= Math.min(MINUTE, current.block.allocatedMs * 0.2) ? "near" : "remaining";
+}
+
+export function signedClock(ms: number): string {
+  return `${ms < 0 ? "−" : "+"}${formatClock(Math.round(Math.abs(ms) / SECOND) * SECOND)}`;
+}
+
+export function blockTiming(block: AppMeetingBlock): string {
+  const allowance = block.allocatedAtStartMs;
+  if (allowance === undefined) return "Starting allocation unavailable";
+  const variance = block.actualMs - allowance;
+  if (Math.abs(variance) < SECOND) return "On time";
+  return `${formatClock(Math.abs(variance))} ${variance < 0 ? "early" : "over"}`;
 }
 
 /** A short length for lists: "45 s", "10 min", "1 h 5 min". */

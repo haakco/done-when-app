@@ -1,11 +1,12 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { ExpiryField } from "../components/ExpiryField";
 import { Field } from "../components/Field";
 import { WriteError } from "../components/ItemStates";
 import { WithData } from "../components/WithData";
 import type { DoneWhenData, MeetingDraft } from "../data";
+import { sampleMeetingAgenda } from "../data/meeting-example";
 import { DEFAULT_EXPIRY_SECONDS } from "../lib/expiry";
 import { ownerPath } from "../lib/links";
 import { formatLength } from "../lib/meeting";
@@ -20,11 +21,13 @@ type Row = { id: number; title: string; minutes: string };
 type Move = "up" | "down";
 
 export function NewMeetingPage() {
+  const [params] = useSearchParams();
+  const sample = params.get("example") === "launch-review";
   return (
     <>
       <h1>New meeting</h1>
-      <p className="lede">Plan the agenda with a time for each part. Run it live: if one part runs long, the rest shrink to fit, and afterwards you see planned against actual.</p>
-      <WithData>{({ data }) => <MeetingForm data={data} />}</WithData>
+      <p className="lede">Plan the agenda with a time for each part. Run it live: saved time goes back to the blocks that remain, overruns reduce their time, and the history shows how it went.</p>
+      <WithData>{({ data }) => <MeetingForm data={data} sample={sample} />}</WithData>
     </>
   );
 }
@@ -44,11 +47,13 @@ function rowError(row: Row): string | null {
   return null;
 }
 
-function MeetingForm({ data }: { data: DoneWhenData }) {
+function MeetingForm({ data, sample }: { data: DoneWhenData; sample: boolean }) {
   const navigate = useNavigate();
-  const nextId = useRef(2);
-  const [name, setName] = useState("");
-  const [rows, setRows] = useState<Row[]>([{ id: 1, title: "", minutes: "" }]);
+  const [name, setName] = useState(sample ? "Launch review" : "");
+  const [rows, setRows] = useState<Row[]>(() => sample
+    ? sampleMeetingAgenda.map(({ title, minutes }, index) => ({ id: index + 1, title, minutes: String(minutes) }))
+    : [{ id: 1, title: "", minutes: "" }]);
+  const nextId = useRef(rows.length + 1);
   const [expiry, setExpiry] = useState(DEFAULT_EXPIRY_SECONDS);
   const [moved, setMoved] = useState("");
   const controls = useRef(new Map<string, HTMLElement>());

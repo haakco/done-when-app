@@ -1,7 +1,7 @@
 import { useAppMeeting } from "@haakco/custd-react";
-import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES, type AppMeeting } from "@haakco/custd-sdk/browser";
+import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { ItemHeader } from "../components/ItemHeader";
 import { ReadOnlyNotice, WriteError } from "../components/ItemStates";
@@ -12,7 +12,7 @@ import { isStaleMeetingStep, type DoneWhenData, type ItemAccess } from "../data"
 import { meetingOf } from "../data/live";
 import { formatTime } from "../lib/dates";
 import { meetingWorkbook } from "../lib/exports";
-import { formatClock, formatDifference, formatLength, liveAgenda, meetingOutcome, type CurrentBlock, type LiveAgenda } from "../lib/meeting";
+import { blockTiming, clockPhase, formatClock, formatLength, liveAgenda, meetingOutcome, signedClock, type AppMeeting, type ClockPhase, type CurrentBlock, type LiveAgenda, type MeetingAdjustment } from "../lib/meeting";
 import { useNow } from "../lib/use-now";
 import "../styles/meeting.css";
 import { MeetingMinutes } from "./MeetingMinutes";
@@ -26,8 +26,21 @@ export function MeetingView({ data, access, read, live, showOwnerTools, ownerRou
   const running = meeting.status === APP_MEETING_STATUSES.running;
   const now = useNow(running);
   const agenda = liveAgenda(meeting, now);
+  const article = useRef<HTMLElement>(null);
+  const previousStatus = useRef(meeting.status);
+  useEffect(() => {
+    if (showOwnerTools && document.activeElement === document.body) {
+      if (previousStatus.current === APP_MEETING_STATUSES.ready && running) {
+        article.current?.querySelector<HTMLHeadingElement>("#now-title")?.focus();
+      }
+      if (previousStatus.current === APP_MEETING_STATUSES.running && meeting.status === APP_MEETING_STATUSES.completed) {
+        article.current?.querySelector<HTMLHeadingElement>("#outcome-heading")?.focus();
+      }
+    }
+    previousStatus.current = meeting.status;
+  }, [meeting.status, running, showOwnerTools]);
   return (
-    <article aria-labelledby="item-name" className="item meeting">
+    <article ref={article} aria-labelledby="item-name" className="item meeting">
       <ItemHeader
         data={data}
         access={access}
@@ -42,7 +55,7 @@ export function MeetingView({ data, access, read, live, showOwnerTools, ownerRou
       {meeting.status === APP_MEETING_STATUSES.ready ? <ReadySummary meeting={meeting} data={data} access={access} owner={showOwnerTools} /> : null}
       {running && agenda.current ? <NowSummary meeting={meeting} current={agenda.current} agenda={agenda} data={data} access={access} owner={showOwnerTools} refresh={live.refresh} /> : null}
       {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? <MeetingOutcomeView meeting={meeting} /> : null}
-      {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? null : <MeetingAgenda agenda={agenda} running={running} />}
+      {meeting.status === APP_MEETING_STATUSES.completed || meeting.status === APP_MEETING_STATUSES.cancelled ? null : <MeetingAgenda agenda={agenda} meeting={meeting} running={running} />}
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
       {showOwnerTools ? <MeetingMinutes saved={read.meetingMinutes} revision={read.item.version} save={async (update) => {
         await data.updateMeetingMinutes(access, update);
@@ -96,51 +109,58 @@ function ReadySummary({ meeting, data, access, owner }: StepProps) {
 type NowProps = StepProps & { current: CurrentBlock; agenda: LiveAgenda; refresh: () => void };
 
 function NowSummary({ meeting, current, agenda, data, access, owner, refresh }: NowProps) {
-  const over = current.overMs > 0;
   const nextTitle = agenda.upcoming.find((block) => block.lengthMs > 0)?.block.title;
-  const late = agenda.endsAtMs !== null && meeting.endsAt ? agenda.endsAtMs - Date.parse(meeting.endsAt) : 0;
   return (
-    <section className={`summary meeting-now${over ? " meeting-now--over" : ""}`} aria-labelledby="now-title">
-      <p className="meeting-now__label small">
-        Now · block {current.block.position} of {meeting.blocks?.length ?? 0}
-      </p>
-      <h2 id="now-title" className="meeting-now__title">
-        {current.block.title}
-      </h2>
-      <p className="meeting-now__clock numeric" role="timer" aria-live="off">
-        {over ? (
-          <>
-            <span aria-hidden="true">! </span>
-            {formatClock(current.overMs)} over
-          </>
-        ) : (
-          <>{formatClock(current.leftMs)} left</>
-        )}
-      </p>
-      <p className="summary__detail meeting-now__detail">
-        {over ? "Over time. The blocks after this one are shrinking to fit." : `Planned ${formatLength(current.block.allocatedMs)}.`}{" "}
-        {meeting.endsAt && agenda.endsAtMs !== null && late !== 0 ? `Originally planned to end at ${formatTime(new Date(meeting.endsAt))}. ` : ""}
-        {agenda.endsAtMs !== null ? `Ends ${late >= 60_000 ? `late, at ${formatTime(new Date(agenda.endsAtMs))}` : `at ${formatTime(new Date(agenda.endsAtMs))}`}.` : ""}
-      </p>
-      <OverrunAnnouncer title={current.block.title} over={over} />
+    <MeetingClock meeting={meeting} current={current} endsAtMs={agenda.endsAtMs}>
       {owner ? <StepButtons data={data} access={access} blockUuid={current.block.blockUuid} nextTitle={nextTitle ?? null} refresh={refresh} /> : null}
-    </section>
+    </MeetingClock>
   );
 }
 
-/** Says once, politely, when the block changes and when it runs over; the clock itself stays quiet. */
-function OverrunAnnouncer({ title, over }: { title: string; over: boolean }) {
-  const [message, setMessage] = useState("");
-  const said = useRef({ title: "", over: false });
-  useEffect(() => {
-    if (said.current.title !== title) setMessage(`Now: ${title}.`);
-    else if (over && !said.current.over) setMessage(`${title} is over time.`);
-    said.current = { title, over };
-  }, [title, over]);
+const phaseLabel: Record<ClockPhase, string> = {
+  remaining: "Time left",
+  near: "Nearly out of time",
+  zero: "Time’s up",
+  over: "Over by",
+};
+
+export function MeetingClock({ meeting, current, endsAtMs, children }: {
+  meeting: AppMeeting; current: CurrentBlock; endsAtMs: number | null; children?: ReactNode;
+}) {
+  const phase = clockPhase(current);
+  const { block } = current;
+  const previous = meeting.adjustments?.at(-1);
+  const changedBlock = meeting.blocks?.find(({ blockUuid }) => blockUuid === previous?.blockUuid);
+  const affected = previous?.changes.filter((change) => change.beforeMs !== change.afterMs) ?? [];
+  const movedMs = affected.reduce((total, change) => total + change.afterMs - change.beforeMs, 0);
+  const total = block.allocatedAtStartMs ?? block.allocatedMs;
+  const baselineChange = total - block.predictedMs;
+  const lastChange = affected.find((change) => change.blockUuid === block.blockUuid);
+  const lastDelta = lastChange ? lastChange.afterMs - lastChange.beforeMs : 0;
+  const announcement = changedBlock && affected.length > 0
+    ? `${changedBlock.title} finished${changedBlock.allocatedAtStartMs === undefined ? "" : ` ${blockTiming(changedBlock).toLowerCase()}`} · ${formatClock(Math.abs(movedMs))} ${movedMs > 0 ? "added to" : "removed from"} ${affected.length} upcoming ${affected.length === 1 ? "block" : "blocks"}.`
+    : null;
+  const late = endsAtMs !== null && meeting.endsAt && endsAtMs > Date.parse(meeting.endsAt);
   return (
-    <span className="visually-hidden" role="status">
-      {message}
-    </span>
+    <section className={`summary meeting-now meeting-now--${phase}`} aria-labelledby="now-title">
+      <p className="meeting-now__label small">Now · block {block.position} of {meeting.blocks?.length ?? 0}</p>
+      <h2 id="now-title" tabIndex={-1} className="meeting-now__title">{block.title}</h2>
+      <div className="meeting-now__reading" role="timer" aria-live="off">
+        <span className="meeting-now__phase">{phaseLabel[phase]}</span>
+        <span className="meeting-now__clock numeric">{formatClock(phase === "over" ? current.overMs : Math.ceil(current.leftMs / 1000) * 1000)}</span>
+      </div>
+      <div className="meeting-now__track" aria-hidden="true">
+        <span style={{ width: `${total > 0 ? 100 * current.leftMs / total : 0}%` }} />
+      </div>
+      <p className="meeting-now__detail numeric">
+        {formatClock(total)} allocated{baselineChange !== 0 ? ` · ${signedClock(baselineChange)} vs original ${formatClock(block.predictedMs)}` : ""}
+        {lastDelta !== 0 && lastDelta !== baselineChange ? ` · ${baselineChange === 0 ? "Back to plan · " : ""}${signedClock(lastDelta)} last step` : ""}
+      </p>
+      {endsAtMs === null ? null : <p className="meeting-now__finish">{late ? "Projected finish" : "Meeting ends"} {formatTime(new Date(endsAtMs))}{late && meeting.endsAt ? ` · planned ${formatTime(new Date(meeting.endsAt))}` : ""}</p>}
+      <p className="visually-hidden" role="status">{block.title} · {phaseLabel[phase]}</p>
+      <p className={announcement ? "meeting-now__movement numeric" : "visually-hidden"} role="status">{announcement}</p>
+      {children}
+    </section>
   );
 }
 
@@ -159,6 +179,10 @@ function StepButtons({ data, access, blockUuid, nextTitle, refresh }: StepButton
     mutationFn: () => data.endMeeting(access),
     onError: (error) => { if (isStaleMeetingStep(error)) refresh(); },
   });
+  const stepButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (sentFor !== null && sentFor !== blockUuid && document.activeElement === document.body && !advance.isPending) stepButton.current?.focus();
+  }, [advance.isPending, blockUuid, sentFor]);
   const waiting = advance.isPending || sentFor === blockUuid;
   const error = [advance.error, end.error].find((candidate) => candidate && !isStaleMeetingStep(candidate)) ?? null;
   return (
@@ -167,6 +191,7 @@ function StepButtons({ data, access, blockUuid, nextTitle, refresh }: StepButton
         <button
           type="button"
           className="button button--primary button--big"
+          ref={stepButton}
           disabled={waiting || end.isPending}
           onClick={() => {
             if (sentFor === blockUuid) return;
@@ -200,47 +225,86 @@ function StepButtons({ data, access, blockUuid, nextTitle, refresh }: StepButton
   );
 }
 
-export function MeetingAgenda({ agenda, running }: { agenda: LiveAgenda; running: boolean }) {
+export function MeetingAgenda({ agenda, meeting, running }: { agenda: LiveAgenda; meeting: AppMeeting; running: boolean }) {
+  const latest = new Map(meeting.adjustments?.at(-1)?.changes.map((change) => [change.blockUuid, change]));
+  const scale = Math.max(1, ...agenda.upcoming.map(({ block, lengthMs }) => Math.max(
+    block.predictedMs, block.allocatedMs, lengthMs, latest.get(block.blockUuid)?.beforeMs ?? 0,
+  )));
   return (
-    <section className="section" aria-labelledby="agenda-heading">
-      <h2 id="agenda-heading">{running ? "Rest of the agenda" : "Agenda"}</h2>
+    <>
+      {agenda.upcoming.length > 0 ? (
+        <section className="section" aria-labelledby="agenda-heading">
+          <h2 id="agenda-heading">{running ? "Up next" : "Agenda"}</h2>
+          <ol className="agenda">
+            {agenda.upcoming.map(({ block, lengthMs, startsAtMs }) => {
+              const original = block.predictedMs;
+              const delta = lengthMs - original;
+              const change = latest.get(block.blockUuid);
+              const stepDelta = change ? change.afterMs - change.beforeMs : 0;
+              const projected = running && lengthMs !== block.allocatedMs;
+              const projectionDelta = lengthMs - block.allocatedMs;
+              const latestDelta = projected ? projectionDelta : stepDelta;
+              const visualDelta = delta === 0 && latestDelta < 0 ? latestDelta : delta;
+              const visualStart = Math.min(lengthMs, original);
+              return (
+                <li key={block.blockUuid} className="agenda__row">
+                  <span className="agenda__title">{block.title}</span>
+                  <span className="agenda__time numeric">
+                    {projected ? "Projected · " : ""}
+                    <strong>{lengthMs === 0 ? "No time left" : formatClock(lengthMs)}</strong>
+                    {delta !== 0 || stepDelta !== 0 ? ` · original ${formatClock(original)}` : ""}
+                  </span>
+                  <div className="agenda__track" aria-hidden="true">
+                    <span className="agenda__allocation" style={{ width: `${100 * visualStart / scale}%` }} />
+                    <span className={`agenda__delta agenda__delta--${visualDelta < 0 ? "loss" : "gain"}`} style={{ left: `${100 * visualStart / scale}%`, width: `${100 * Math.abs(visualDelta) / scale}%` }} />
+                    <span className="agenda__original" style={{ left: `${100 * original / scale}%` }} />
+                  </div>
+                  <div className="agenda__meta small numeric">
+                    {delta !== 0 ? <span className={delta < 0 ? "agenda__loss" : "agenda__gain"}>{signedClock(delta)} {delta < 0 ? "removed" : "added"}</span> : null}
+                    {projected && projectionDelta !== delta ? <span className="agenda__loss">{signedClock(projectionDelta)} from overrun</span> : null}
+                    {!projected && stepDelta !== 0 && stepDelta !== delta ? <span>{delta === 0 ? "Back to plan · " : ""}{signedClock(stepDelta)} last step</span> : null}
+                    <span>{running ? `From ${formatTime(new Date(startsAtMs))}` : startsAtMs === 0 ? "First" : `Starts ${formatLength(startsAtMs)} in`}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ) : null}
+      {running && agenda.done.length > 0 ? <MeetingHistory blocks={agenda.done} meeting={meeting} /> : null}
+    </>
+  );
+}
+
+function MeetingHistory({ blocks, meeting }: { blocks: NonNullable<AppMeeting["blocks"]>; meeting: AppMeeting }) {
+  const names = new Map(meeting.blocks?.map((block) => [block.blockUuid, block.title]));
+  const adjustments = new Map(meeting.adjustments?.map((step) => [step.blockUuid, step]));
+  return (
+    <section className="section" aria-labelledby="outcome-heading">
+      <h2 id="outcome-heading" tabIndex={-1}>Meeting history</h2>
       <ol className="agenda">
-        {agenda.done.map((block) => (
-          <li key={block.blockUuid} className="agenda__row agenda__row--done">
-            <span className="agenda__title">
-              <span aria-hidden="true">✓ </span>
-              {block.title}
-            </span>
-            <span className="agenda__time numeric">
-              {block.status === APP_MEETING_BLOCK_STATUSES.skipped ? "Skipped" : `Took ${formatLength(block.actualMs)} (planned ${formatLength(block.predictedMs)})`}
-            </span>
-          </li>
-        ))}
-        {agenda.current ? (
-          <li className="agenda__row agenda__row--now">
-            <span className="agenda__title">
-              <span aria-hidden="true">● </span>
-              {agenda.current.block.title}
-            </span>
-            <span className="agenda__time numeric">On now</span>
-          </li>
-        ) : null}
-        {agenda.upcoming.map(({ block, lengthMs, startsAtMs }) => {
-          const changed = Math.abs(lengthMs - block.predictedMs) >= 1000;
+        {blocks.map((block) => {
+          const ran = block.status === APP_MEETING_BLOCK_STATUSES.completed;
+          const allowance = block.allocatedAtStartMs;
+          const adjustment: MeetingAdjustment | undefined = adjustments.get(block.blockUuid);
+          const changes = adjustment?.changes.filter((change) => change.beforeMs !== change.afterMs) ?? [];
           return (
             <li key={block.blockUuid} className="agenda__row">
               <span className="agenda__title">{block.title}</span>
-              <span className="agenda__time numeric">
-                {lengthMs === 0 ? (
-                  "No time left"
-                ) : (
-                  <>
-                    {formatLength(lengthMs)}
-                    {changed ? <span className="agenda__was"> (was {formatLength(block.predictedMs)})</span> : null}
-                    {running ? ` · from ${formatTime(new Date(startsAtMs))}` : startsAtMs === 0 ? " · first" : ` · starts ${formatLength(startsAtMs)} in`}
-                  </>
-                )}
-              </span>
+              <strong className="numeric">{ran ? blockTiming(block) : block.status === APP_MEETING_BLOCK_STATUSES.skipped ? "Skipped" : "Not reached"}</strong>
+              <div className="agenda__meta small numeric">
+                <span>Original {formatClock(block.predictedMs)}</span>
+                {allowance !== undefined && allowance !== block.predictedMs ? <span>Started with {formatClock(allowance)}</span> : null}
+                {ran ? <span>Actual {formatClock(block.actualMs)}</span> : null}
+              </div>
+              {changes.length > 0 ? (
+                <details className="more agenda__receipt">
+                  <summary>Time changes for {changes.length} {changes.length === 1 ? "block" : "blocks"}</summary>
+                  <ul className="more__body numeric">
+                    {changes.map((change) => <li key={change.blockUuid}>{names.get(change.blockUuid)} · {formatClock(change.beforeMs)} → {formatClock(change.afterMs)} ({signedClock(change.afterMs - change.beforeMs)})</li>)}
+                  </ul>
+                </details>
+              ) : null}
             </li>
           );
         })}
@@ -259,39 +323,7 @@ export function MeetingOutcomeView({ meeting }: { meeting: AppMeeting }) {
           Planned {formatLength(outcome.predictedMs)}, took {formatLength(outcome.actualMs)}.
         </p>
       </section>
-      <section className="section" aria-labelledby="outcome-heading">
-        <h2 id="outcome-heading">Planned and actual</h2>
-        <div className="table-scroll">
-          <table className="estimates outcome-table numeric">
-            <thead>
-              <tr>
-                <th scope="col">Block</th>
-                <th scope="col">Planned</th>
-                <th scope="col">Actual</th>
-                <th scope="col">Difference</th>
-              </tr>
-            </thead>
-            <tbody>
-              {outcome.rows.map((row) => (
-                <tr key={row.block.blockUuid}>
-                  <th scope="row">{row.block.title}</th>
-                  <td>{formatLength(row.block.predictedMs)}</td>
-                  <td>{row.actualMs === null ? "Not reached" : formatLength(row.actualMs)}</td>
-                  <td>{row.differenceMs === null ? "—" : formatDifference(row.differenceMs)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <th scope="row">Total</th>
-                <td>{formatLength(outcome.predictedMs)}</td>
-                <td>{formatLength(outcome.actualMs)}</td>
-                <td>{formatDifference(outcome.differenceMs)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </section>
+      <MeetingHistory blocks={outcome.rows.map(({ block }) => block)} meeting={meeting} />
     </>
   );
 }

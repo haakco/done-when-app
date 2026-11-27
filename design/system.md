@@ -103,6 +103,8 @@ heavy shadows. The progress bar is a thick rule with a finish tick at the target
 | `StaleEstimateNudge` | Owner's gentle "estimate is N days old" line with "Add an estimate" and "Not now" |
 | `GuessFirst` / `GuessResults` | Share-page viewers of an active counter guess first (any number of named guesses on the device), or skip; the forecast stays hidden until then. Once done: who was closest, the forecast as shown at the reveal included. Lazy-loaded |
 | `CalibrationCard` | Finished project: ✓/✕ per 90% range and "N of M ranges included the date it was done", in plain words with a small-sample caveat. Lazy-loaded |
+| Meeting clock | Tabular countdown and draining track, with done, warn and stop accents. Announce phase changes once and keep the ticking clock quiet. The meeting finish has a separate line from the current block's time. |
+| Meeting allocation and history | Upcoming blocks share one bar scale and mark the original duration with a tick. A solid extension shows gained time and a hatched tail shows lost time. Text names the signed change and whether the number is a projection. History shows the starting allocation, actual duration and confirmed changes to later blocks. |
 | Big screen (`?tv=1`) | `.page--tv`: no header, footer, actions, disclosures or chart controls; large type; owner tools off; the live line stays. "Leave big screen" appears only on focus |
 | `ImportPanel` | Owner tools "Import …": paste or choose a CSV or .xlsx, then a preview (count, bad rows by line, sample table) and one "Import N …" button |
 

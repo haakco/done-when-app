@@ -1,60 +1,74 @@
-import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES, type AppMeeting, type AppMeetingBlock } from "@haakco/custd-sdk/browser";
+import { APP_MEETING_BLOCK_STATUSES as BLOCK, APP_MEETING_STATUSES as MEETING } from "@haakco/custd-sdk/browser";
+import type { AppMeeting, AppMeetingBlock, MeetingAdjustment } from "../lib/meeting";
 
 export const MEETING_EXAMPLE_START = Date.parse("2026-12-01T10:00:00");
 const MINUTE = 60_000;
 const timeAt = (minute: number) => new Date(MEETING_EXAMPLE_START + minute * MINUTE).toISOString();
-const plannedMinutes = 5;
-const reviewMinutes = 3;
-const decisionMinutes = 8;
-const totalMinutes = reviewMinutes + decisionMinutes;
 
 export const meetingExampleSteps = [
   { minute: 0, action: "Start sample meeting" },
-  { minute: 0, action: "Finish review after 3 min" },
-  { minute: reviewMinutes, action: "Run decisions to 8 min" },
-  { minute: totalMinutes, action: "Finish sample meeting" },
-  { minute: totalMinutes, action: "Reset sample meeting" },
+  { minute: 0, action: "Finish check-in after 3 min" },
+  { minute: 3, action: "Run decisions to 7 min" },
+  { minute: 10, action: "Finish decisions and confirm the timing" },
+  { minute: 10, action: "Finish follow-up after 5 min" },
+  { minute: 15, action: "Reset sample meeting" },
 ] as const;
 
-export type MeetingExampleStep = 0 | 1 | 2 | 3 | 4;
+export type MeetingExampleStep = 0 | 1 | 2 | 3 | 4 | 5;
+export const LAST_MEETING_EXAMPLE_STEP = 5;
+
+export function meetingExampleStep(value: string | null, fallback: MeetingExampleStep = 0): MeetingExampleStep {
+  if (value === null || !/^[0-5]$/.test(value)) return fallback;
+  return Number(value) as MeetingExampleStep;
+}
+
+export const sampleMeetingAgenda = [
+  { blockUuid: "sample-review", title: "Check-in", minutes: 5, started: 0, ended: 3, activeStep: 1, completedStep: 2 },
+  { blockUuid: "sample-decisions", title: "Decide next steps", minutes: 5, started: 3, ended: 10, activeStep: 2, completedStep: 4 },
+  { blockUuid: "sample-follow-up", title: "Assign follow-up", minutes: 5, started: 10, ended: 15, activeStep: 4, completedStep: 5 },
+] as const;
 
 export function meetingExample(step: MeetingExampleStep): AppMeeting {
   const ready = step === 0;
-  const reviewDone = step >= 2;
-  const meetingDone = step === 4;
-  const review: AppMeetingBlock = {
-    blockUuid: "sample-review",
-    position: 1,
-    title: "Review progress",
-    status: ready ? APP_MEETING_BLOCK_STATUSES.pending : reviewDone ? APP_MEETING_BLOCK_STATUSES.completed : APP_MEETING_BLOCK_STATUSES.active,
-    predictedMs: plannedMinutes * MINUTE,
-    allocatedMs: plannedMinutes * MINUTE,
-    actualMs: reviewDone ? reviewMinutes * MINUTE : 0,
-    ...(ready ? {} : { startedAt: timeAt(0) }),
-    ...(reviewDone ? { endedAt: timeAt(reviewMinutes) } : {}),
-  };
-  const decisions: AppMeetingBlock = {
-    blockUuid: "sample-decisions",
-    position: 2,
-    title: "Decide next steps",
-    status: meetingDone ? APP_MEETING_BLOCK_STATUSES.completed : reviewDone ? APP_MEETING_BLOCK_STATUSES.active : APP_MEETING_BLOCK_STATUSES.pending,
-    predictedMs: plannedMinutes * MINUTE,
-    allocatedMs: (reviewDone ? 2 * plannedMinutes - reviewMinutes : plannedMinutes) * MINUTE,
-    actualMs: meetingDone ? decisionMinutes * MINUTE : 0,
-    ...(reviewDone ? { startedAt: timeAt(reviewMinutes) } : {}),
-    ...(meetingDone ? { endedAt: timeAt(totalMinutes) } : {}),
-  };
+  const ended = step === LAST_MEETING_EXAMPLE_STEP;
+  const blocks: AppMeetingBlock[] = sampleMeetingAgenda.map((block, index) => {
+    const started = block.activeStep <= step;
+    const completed = block.completedStep <= step;
+    const allocatedMs = (block.minutes + (index === 1 && step >= 2 || index === 2 && (step === 2 || step === 3) ? 1 : 0)) * MINUTE;
+    return {
+      blockUuid: block.blockUuid,
+      position: index + 1,
+      title: block.title,
+      status: completed ? BLOCK.completed : started ? BLOCK.active : BLOCK.pending,
+      predictedMs: block.minutes * MINUTE,
+      allocatedMs,
+      actualMs: completed ? (block.ended - block.started) * MINUTE : 0,
+      ...(started ? { startedAt: timeAt(block.started), allocatedAtStartMs: allocatedMs } : {}),
+      ...(completed ? { endedAt: timeAt(block.ended) } : {}),
+    };
+  });
+  const finished = blocks.filter(({ status }) => status === BLOCK.completed);
+  const adjustments: MeetingAdjustment[] = [];
+  if (step >= 2) adjustments.push({
+    blockUuid: sampleMeetingAgenda[0].blockUuid,
+    changes: sampleMeetingAgenda.slice(1).map(({ blockUuid }) => ({ blockUuid, beforeMs: 5 * MINUTE, afterMs: 6 * MINUTE })),
+  });
+  if (step >= 4) adjustments.push({
+    blockUuid: sampleMeetingAgenda[1].blockUuid,
+    changes: [{ blockUuid: sampleMeetingAgenda[2].blockUuid, beforeMs: 6 * MINUTE, afterMs: 5 * MINUTE }],
+  });
   return {
     name: "Launch review",
-    status: ready ? APP_MEETING_STATUSES.ready : meetingDone ? APP_MEETING_STATUSES.completed : APP_MEETING_STATUSES.running,
-    ...(ready ? {} : { startedAt: timeAt(0), endsAt: timeAt(2 * plannedMinutes) }),
-    blocks: [review, decisions],
+    status: ready ? MEETING.ready : ended ? MEETING.completed : MEETING.running,
+    ...(ready ? {} : { startedAt: timeAt(0), endsAt: timeAt(15) }),
+    blocks,
+    adjustments,
     summary: {
-      predictedMs: 2 * plannedMinutes * MINUTE,
-      finishedPredictedMs: (meetingDone ? 2 : reviewDone ? 1 : 0) * plannedMinutes * MINUTE,
-      finishedActualMs: (meetingDone ? totalMinutes : reviewDone ? reviewMinutes : 0) * MINUTE,
-      finishedBlocks: meetingDone ? 2 : reviewDone ? 1 : 0,
-      overrunMs: Math.max(0, meetingExampleSteps[step].minute - 2 * plannedMinutes) * MINUTE,
+      predictedMs: 15 * MINUTE,
+      finishedPredictedMs: finished.length * 5 * MINUTE,
+      finishedActualMs: finished.reduce((total, block) => total + block.actualMs, 0),
+      finishedBlocks: finished.length,
+      overrunMs: 0,
     },
   };
 }

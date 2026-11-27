@@ -22,56 +22,72 @@ async function buildAgenda(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { level: 1, name: "Weekly sync" })).toBeVisible();
 }
 
-test("run a meeting: an overrun rebalances the rest, a share link follows it, and the summary compares plan and actual", async ({ page, browser, fake }) => {
+test("run a meeting: earned time, projected loss and confirmed history", async ({ page, browser, fake }) => {
   test.slow();
   await page.clock.install();
   await buildAgenda(page);
+  let meetingTime = Date.now() + 5000;
+  await page.clock.pauseAt(meetingTime);
+  fake.setMeetingClock(meetingTime);
   await expect(page.getByText("25 min planned")).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "Planning" })).toContainText("10 min · starts 15 min in");
 
+  const jump = async (minutes: number) => {
+    meetingTime += minutes * MINUTE;
+    fake.setMeetingClock(meetingTime);
+    await page.clock.fastForward(minutes * MINUTE);
+  };
   await page.getByRole("button", { name: "Start meeting" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "Check-in" })).toBeVisible();
-  await expect(page.getByRole("timer")).toHaveText(/^[45]:\d\d left$/);
+  await expect(page.getByRole("timer")).toContainText("Time left");
+  await jump(3);
 
-  // Check-in runs 2 minutes over: Demo and Planning each give up a minute.
-  fake.advanceClock(7 * MINUTE);
-  await page.clock.fastForward(7 * MINUTE);
-  await expect(page.getByRole("timer")).toHaveText(/^! 2:0\d over$/);
-  await expect(page.getByText("Over time. The blocks after this one are shrinking to fit.")).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "Demo" })).toContainText(/9 min \(was 10 min\)/);
-  await expect(page.getByRole("listitem").filter({ hasText: "Planning" })).toContainText(/9 min \(was 10 min\)/);
-
-  // The share link shows the meeting read-only and follows it live.
   const shareUrl = await copyShareUrl(page);
   expect(shareUrl).toMatch(/\/meet\/[A-Za-z0-9_-]{43}$/);
-  const viewer = await browser.newContext();
-  await routeToFake(viewer, fake);
-  const viewerPage = await viewer.newPage();
-  await viewerPage.goto(shareUrl);
-  await expect(viewerPage.getByRole("heading", { level: 2, name: "Check-in" })).toBeVisible();
-  await expect(viewerPage.getByRole("button", { name: /Next block|End meeting/ })).toHaveCount(0);
+  const viewer = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", reducedMotion: "reduce" });
+  try {
+    await routeToFake(viewer, fake);
+    const viewerPage = await viewer.newPage();
+    await viewerPage.goto(`${shareUrl}?tv=1`);
+    await expect(viewerPage.getByRole("heading", { level: 2, name: "Check-in" })).toBeVisible();
+    await expect(viewerPage.getByRole("button", { name: /Next block|End meeting/ })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Next block: Demo" }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Demo" })).toBeVisible();
-  await expect(page.getByRole("listitem").filter({ hasText: "Check-in" })).toContainText("Took 7 min (planned 5 min)");
-  await expect(viewerPage.getByRole("heading", { level: 2, name: "Demo" })).toBeVisible();
-  await viewer.close();
+    await page.getByRole("button", { name: "Next block: Demo" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", { level: 2, name: "Demo" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Next block: Planning" })).toBeFocused();
+    await expect(page.getByText("11:00 allocated · +1:00 vs original 10:00")).toBeVisible();
+    await expect(page.getByText("Check-in finished 2:00 early · 2:00 added to 2 upcoming blocks.")).toBeVisible();
+    await expect(page.getByRole("listitem").filter({ hasText: "Planning" }).filter({ hasText: "From" })).toContainText("+1:00 added");
+    await expect(viewerPage.getByRole("heading", { level: 2, name: "Demo" })).toBeVisible();
 
-  // A double-click finishes Demo only.
-  await page.getByRole("button", { name: "Next block: Planning" }).dblclick();
-  await expect(page.getByRole("heading", { level: 2, name: "Planning" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Finish last block" })).toBeVisible();
-  expect(fake.requests.filter((request) => request.url.endsWith("/meeting/advance"))).toHaveLength(2);
+    await jump(10.5);
+    await expect(page.getByRole("timer")).toContainText("Nearly out of time");
+    await jump(1.5);
+    await expect(page.getByRole("timer")).toContainText("Over by");
+    await expect(page.getByRole("listitem").filter({ hasText: "Planning" }).filter({ hasText: "From" })).toContainText("Projected");
+    await expect(page.getByText("−1:00 from overrun")).toBeVisible();
 
-  await page.getByRole("button", { name: "End meeting" }).click();
-  await page.getByRole("button", { name: "End now" }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Planned and actual" })).toBeVisible();
-  await expect(page.getByText(/^Finished \d+ minutes early; “Check-in” took longest\.$/)).toBeVisible();
-  const checkIn = page.getByRole("row", { name: /Check-in/ });
-  await expect(checkIn).toContainText("5 min");
-  await expect(checkIn).toContainText("7 min");
-  await expect(checkIn).toContainText("+2 min");
-  await expect(page.getByRole("row", { name: /Total/ })).toContainText("25 min");
+    // One double-click finishes Demo only.
+    await page.getByRole("button", { name: "Next block: Planning" }).dblclick();
+    await expect(page.getByRole("heading", { level: 2, name: "Planning" })).toBeVisible();
+    await expect(page.getByText("10:00 allocated · Back to plan · −1:00 last step")).toBeVisible();
+    expect(fake.requests.filter((request) => request.url.endsWith("/meeting/advance"))).toHaveLength(2);
+
+    await jump(10);
+    await page.getByRole("button", { name: "Finish last block" }).click();
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 2, name: "Meeting history" })).toBeVisible();
+    const checkIn = page.getByRole("listitem").filter({ hasText: "Check-in" });
+    await expect(checkIn).toContainText("2:00 early");
+    await checkIn.getByText("Time changes for 2 blocks").click();
+    await expect(checkIn.getByText("Demo · 10:00 → 11:00 (+1:00)")).toBeVisible();
+    const demo = page.getByRole("listitem").filter({ hasText: "Started with 11:00" });
+    await expect(demo).toContainText("1:00 over");
+    await demo.getByText("Time changes for 1 block").click();
+    await expect(demo.getByText("Planning · 11:00 → 10:00 (−1:00)")).toBeVisible();
+  } finally {
+    await viewer.close();
+  }
 });
 
 test("a stale Next from a second owner tab refreshes quietly", async ({ page, context }) => {

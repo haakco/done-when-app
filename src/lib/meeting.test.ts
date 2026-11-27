@@ -1,6 +1,5 @@
-import type { AppMeeting, AppMeetingBlock } from "@haakco/custd-sdk/browser";
 import { describe, expect, it } from "vitest";
-import { durationWords, formatClock, formatDifference, formatLength, liveAgenda, meetingOutcome } from "./meeting";
+import { blockTiming, clockPhase, signedClock, type AppMeeting, type AppMeetingBlock, durationWords, formatClock, formatDifference, formatLength, liveAgenda, meetingOutcome } from "./meeting";
 
 const MIN = 60_000;
 const START = Date.parse("2026-11-18T10:00:00Z");
@@ -77,5 +76,24 @@ describe("formats", () => {
     expect([formatLength(45_000), formatLength(10 * MIN), formatLength(65 * MIN), formatLength(120 * MIN)]).toEqual(["45 s", "10 min", "1 h 5 min", "2 h"]);
     expect([durationWords(30_000), durationWords(MIN), durationWords(65 * MIN)]).toEqual(["30 seconds", "1 minute", "1 hour 5 minutes"]);
     expect([formatDifference(2 * MIN), formatDifference(-MIN), formatDifference(10_000)]).toEqual(["+2 min", "−1 min", "on time"]);
+  });
+});
+
+describe("meeting timing display", () => {
+  it("distinguishes remaining, near, zero and over against the allocated duration", () => {
+    const running = meeting("running", [block(1, "A", 2, { status: "active", startedAt: at(0) })]);
+    const phases = [95_999, 96_000, 120_000, 121_000].map((elapsed) => {
+      const { current } = liveAgenda(running, START + elapsed);
+      if (!current) throw new Error("Expected an active block");
+      return clockPhase(current);
+    });
+    expect(phases).toEqual(["remaining", "near", "zero", "over"]);
+  });
+
+  it("compares actual with the starting allocation and retains seconds in short changes", () => {
+    const completed = block(2, "Demo", 5, { allocatedMs: 6 * MIN, allocatedAtStartMs: 6 * MIN, actualMs: 7 * MIN });
+    expect(blockTiming(completed)).toBe("1:00 over");
+    expect(blockTiming(block(3, "Old", 5))).toBe("Starting allocation unavailable");
+    expect(signedClock(-10_000)).toBe("−0:10");
   });
 });
