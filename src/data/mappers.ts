@@ -260,7 +260,7 @@ export function projectCreateRequest(draft: ProjectDraft): AppItemCreateRequest 
       series: [
         { seriesCode: PROJECT_SERIES_CODE, name: "Estimates", unitSlug: UNIT_SLUG, completionDirection: "increase", source: "manual" },
       ],
-      target: { targetCode: TARGET_CODE, name: draft.name, targetValue: 1, targetDate: draft.deliveryTarget, state: "active" },
+      target: { targetCode: TARGET_CODE, name: draft.name, targetValue: 1, ...(draft.deliveryTarget ? { targetDate: draft.deliveryTarget } : {}), state: "active" },
     },
   };
 }

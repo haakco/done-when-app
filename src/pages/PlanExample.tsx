@@ -1,6 +1,6 @@
 import { ForecastChart } from "@haakco/custd-react";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import example from "../data/plan-example.json";
 import { formatDate, formatShortDate } from "../lib/dates";
 import { PlanProgress } from "./PlanProgress";
@@ -27,7 +27,8 @@ const previewDuration = signOff?.previewDurationDays?.join("–");
 const chance = (value: number) => `${Math.round(value * 100)}%`;
 
 export default function PlanExample() {
-  const [preview, setPreview] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const preview = params.get("estimate") === "long";
   const [showCanvas, setShowCanvas] = useState(false);
   const { hash } = useLocation();
   const scenario = preview ? "preview" : "baseline";
@@ -43,18 +44,30 @@ export default function PlanExample() {
       <p className="small muted">Example plan · fictional tasks and measurements</p>
       <h1>Launch the new site</h1>
       <p>Editing and checks can run in parallel. Launch sign-off starts after both finish.</p>
-      <h2>Likely done {formatDate(forecast.median)}</h2>
-      <p>90% forecast range · {formatDate(forecast.lower)} to {formatDate(forecast.upper)}</p>
-      <p>{chance(forecast.deadlineProbability)} chance by {formatDate(example.inputs.deadline)}</p>
-      <p role="status">
-        {preview ? `Likely finish moved from ${formatDate(example.baseline.median)} to ${formatDate(forecast.median)}. The forecast range is now ${formatDate(forecast.lower)} to ${formatDate(forecast.upper)}. Deadline chance moved from ${chance(example.baseline.deadlineProbability)} to ${chance(forecast.deadlineProbability)}.` : ""}
-      </p>
+      <section className="summary" aria-label="Overall forecast">
+        <h2>Likely done {formatDate(forecast.median)}</h2>
+        <p>90% forecast range · {formatDate(forecast.lower)} to {formatDate(forecast.upper)}</p>
+        <p>{chance(forecast.deadlineProbability)} chance by {formatDate(example.inputs.deadline)}</p>
+        <p role="status">
+          {preview ? `Likely finish moved from ${formatDate(example.baseline.median)} to ${formatDate(forecast.median)}. The forecast range moved from ${formatDate(example.baseline.lower)}–${formatDate(example.baseline.upper)} to ${formatDate(forecast.lower)}–${formatDate(forecast.upper)}. Deadline chance moved from ${chance(example.baseline.deadlineProbability)} to ${chance(forecast.deadlineProbability)}.` : ""}
+        </p>
+      </section>
       <p>Launch sign-off estimate · {duration} days</p>
-      <button type="button" className="button button--primary" onClick={() => { setPreview(!preview); }}>
+      <button type="button" className="button button--primary" onClick={() => {
+        setParams((current) => {
+          const next = new URLSearchParams(current);
+          if (preview) next.delete("estimate");
+          else next.set("estimate", "long");
+          return next;
+        }, { replace: true });
+      }}>
         {preview ? "Reset sign-off estimate" : `Allow ${previewDuration} days for sign-off`}
       </button>
-      <p>Monte Carlo simulation samples a possible duration for each task and applies the dependencies on each of {example.inputs.trials} runs. The median splits the simulated finishes in half. The 90% range shows the middle 90% of finishes, and the deadline chance counts runs that finished by the deadline.</p>
-      <p><Link to="/help/forecasting">Forecasting guide</Link></p>
+      <details className="more">
+        <summary>How the simulation works</summary>
+        <p>Monte Carlo simulation samples a possible duration for each task and applies the dependencies on each of {example.inputs.trials} runs. The median splits the simulated finishes in half. The 90% range shows the middle 90% of finishes, and the deadline chance counts runs that finished by the deadline.</p>
+        <p><Link to="/help/forecasting">Forecasting guide</Link></p>
+      </details>
       <details className="more">
         <summary>Simulated finish dates</summary>
         <table className="estimates">
@@ -110,7 +123,7 @@ export default function PlanExample() {
         {showCanvas ? <Suspense fallback={<p>Loading canvas…</p>}><PlanCanvas parts={parts} names={names} inspect={inspect} /></Suspense> : null}
       </details>
       <p><Link className="button button--primary" to="/new/plan">Start a plan</Link></p>
-      <p><Link to="/examples/dashboard">See the sample dashboard</Link></p>
+      <p><Link to={`/examples/dashboard${preview ? "?estimate=long" : ""}`}>See the sample dashboard</Link></p>
     </div>
   );
 }

@@ -175,9 +175,14 @@ export function createDoneWhenData(items: AppItemsClient, trackModel?: (event: M
 
     async createProject(draft) {
       const result = await items.createItem(projectCreateRequest(draft));
-      await items.updateSettings(result.ownerToken, {
-        project: { definitionOfDone: draft.definitionOfDone, deliveryTargetDate: draft.deliveryTarget },
-      });
+      if (draft.definitionOfDone || draft.deliveryTarget) {
+        await items.updateSettings(result.ownerToken, {
+          project: {
+            ...(draft.definitionOfDone ? { definitionOfDone: draft.definitionOfDone } : {}),
+            ...(draft.deliveryTarget ? { deliveryTargetDate: draft.deliveryTarget } : {}),
+          },
+        });
+      }
       return created("project", result);
     },
     async addEstimate(owner, estimate) {

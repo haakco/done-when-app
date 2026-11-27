@@ -128,9 +128,9 @@ export type CounterDraft = {
 
 export type ProjectDraft = {
   name: string;
-  definitionOfDone: string;
-  /** RFC 3339. */
-  deliveryTarget: string;
+  definitionOfDone?: string;
+  /** RFC 3339 when a delivery target has been agreed. */
+  deliveryTarget?: string;
   expiresAfterSeconds: number;
 };
 
