@@ -3,6 +3,17 @@ import { copyShareUrl, createCounter, expect, routeToFake, test } from "./fixtur
 
 const HISTORY = ["timestamp,value", "2026-11-01T00:00:00Z,10", "2026-11-02T00:00:00Z,20", "2026-11-03T00:00:00Z,30"].join("\n");
 
+test("a refused account settings ticket offers a fresh sign-in on My items", async ({ page }) => {
+  await page.route("**/settings/entry/ticket", (route) => route.fulfill({ status: 403 }));
+  await page.goto("/mine");
+  await page.getByRole("navigation").getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Account settings", exact: true }).click();
+
+  const recovery = page.getByRole("status").filter({ hasText: "Account settings could not open" });
+  await expect(recovery.getByRole("link", { name: "Sign in again" })).toHaveAttribute("href", "/mine?custd_account=sign_in_again");
+  await expect(page).toHaveURL(/\/mine$/);
+});
+
 test("create a counter from CSV, share it live, set an alert, then sign in and claim it", async ({ page, browser, fake }) => {
   // The longest journey: two browsers, alerts and a sign-in do not fit the default 30 s on a busy host.
   test.slow();

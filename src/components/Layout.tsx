@@ -1,4 +1,5 @@
 import { CustdAccountMenuItem } from "@haakco/custd-react";
+import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 import { TV_PARAM, useTvMode } from "../lib/use-motion";
 import { CelebrationsToggle } from "./Moments";
@@ -66,6 +67,7 @@ function BigScreenLayout() {
 
 function AccountLink() {
   const session = useSession();
+  const [accountEntryFailed, setAccountEntryFailed] = useState(false);
   if (!session.available) return null;
   if (!session.signedIn) {
     return (
@@ -85,11 +87,13 @@ function AccountLink() {
             issuer={session.account.issuer}
             accessToken={session.account.accessToken}
             returnPath="/mine"
-            onError={() => {
-              // Still reach settings when the issuer refuses a ticket; only the link back is lost.
-              if (session.account) window.location.assign(new URL("/settings", session.account.issuer));
-            }}
+            onError={() => { setAccountEntryFailed(true); }}
           />
+          {accountEntryFailed && (
+            <p role="status">
+              Account settings could not open. <a href="/mine?custd_account=sign_in_again">Sign in again</a>.
+            </p>
+          )}
         </li>
       )}
       <li>
