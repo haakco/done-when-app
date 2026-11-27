@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "inputs": {
     "asOf": "2026-12-01T00:00:00Z",
     "deadline": "2026-12-11T00:00:00Z",
@@ -15,7 +15,6 @@
           13,
           17
         ],
-        "previewValue": 25,
         "target": 60,
         "seed": 170
       },
@@ -43,23 +42,24 @@
           "pages",
           "checks"
         ],
-        "seed": 172
+        "seed": 172,
+        "previewDurationDays": [
+          3,
+          5
+        ]
       }
     ],
     "measurementIntervalDays": 1
   },
   "baseline": {
-    "revision": 1,
     "asOf": "2026-12-01T00:00:00Z",
-    "horizon": "2026-12-31T00:00:00Z",
-    "deadlineProbability": 0.044921875,
-    "requiredParts": 3,
     "completedParts": 0,
+    "deadlineProbability": 0.044921875,
+    "horizon": "2026-12-31T00:00:00Z",
+    "lower": "2026-12-11T00:31:49.529582781Z",
+    "median": "2026-12-11T15:51:05.107362651Z",
     "missingParts": [],
     "model": "independent_finish_to_start_v1",
-    "median": "2026-12-11T15:51:05.107362651Z",
-    "lower": "2026-12-11T00:31:49.529582781Z",
-    "upper": "2026-12-12T10:34:53.651822876Z",
     "projectedProgress": [
       {
         "at": "2026-12-01T00:00:00Z",
@@ -145,20 +145,20 @@
         "median": 3,
         "upper": 3
       }
-    ]
+    ],
+    "requiredParts": 3,
+    "revision": 1,
+    "upper": "2026-12-12T10:34:53.651822876Z"
   },
   "preview": {
-    "revision": 1,
     "asOf": "2026-12-01T00:00:00Z",
-    "horizon": "2026-12-31T00:00:00Z",
-    "deadlineProbability": 0.986328125,
-    "requiredParts": 3,
     "completedParts": 0,
+    "deadlineProbability": 0,
+    "horizon": "2026-12-31T00:00:00Z",
+    "lower": "2026-12-13T02:02:54.908127736Z",
+    "median": "2026-12-14T03:06:44.5975079Z",
     "missingParts": [],
     "model": "independent_finish_to_start_v1",
-    "median": "2026-12-07T11:16:57.763365155Z",
-    "lower": "2026-12-06T14:03:44.067883642Z",
-    "upper": "2026-12-09T12:42:58.142434253Z",
     "projectedProgress": [
       {
         "at": "2026-12-01T00:00:00Z",
@@ -193,31 +193,31 @@
       {
         "at": "2026-12-06T00:00:00Z",
         "lower": 1,
-        "median": 2,
-        "upper": 2
+        "median": 1,
+        "upper": 1
       },
       {
         "at": "2026-12-07T00:00:00Z",
         "lower": 1,
-        "median": 2,
-        "upper": 3
+        "median": 1,
+        "upper": 1
       },
       {
         "at": "2026-12-09T00:00:00Z",
-        "lower": 2,
-        "median": 3,
-        "upper": 3
+        "lower": 1,
+        "median": 1,
+        "upper": 1
       },
       {
         "at": "2026-12-11T00:00:00Z",
-        "lower": 3,
-        "median": 3,
-        "upper": 3
+        "lower": 2,
+        "median": 2,
+        "upper": 2
       },
       {
         "at": "2026-12-14T00:00:00Z",
-        "lower": 3,
-        "median": 3,
+        "lower": 2,
+        "median": 2,
         "upper": 3
       },
       {
@@ -244,36 +244,75 @@
         "median": 3,
         "upper": 3
       }
-    ]
+    ],
+    "requiredParts": 3,
+    "revision": 1,
+    "upper": "2026-12-15T08:16:08.077673785Z"
   },
   "partForecasts": {
-    "baseline": {
-      "checks": {
-        "median": "2026-12-05T05:46:05.866049587Z",
-        "lower": "2026-12-04T22:48:00.99337512Z",
-        "upper": "2026-12-05T15:07:41.560487735Z"
-      },
-      "pages": {
-        "median": "2026-12-10T03:23:56.224884416Z",
-        "lower": "2026-12-09T17:42:31.811783632Z",
-        "upper": "2026-12-10T18:30:05.484665821Z"
-      }
+    "checks": {
+      "lower": "2026-12-04T22:48:00.99337512Z",
+      "median": "2026-12-05T05:46:05.866049587Z",
+      "upper": "2026-12-05T15:07:41.560487735Z"
     },
-    "preview": {
-      "checks": {
-        "median": "2026-12-05T05:46:05.866049587Z",
-        "lower": "2026-12-04T22:48:00.99337512Z",
-        "upper": "2026-12-05T15:07:41.560487735Z"
-      },
-      "pages": {
-        "median": "2026-12-05T21:52:27.537486012Z",
-        "lower": "2026-12-05T01:11:31.336949547Z",
-        "upper": "2026-12-07T23:34:40.811892506Z"
-      }
+    "pages": {
+      "lower": "2026-12-09T17:42:31.811783632Z",
+      "median": "2026-12-10T03:23:56.224884416Z",
+      "upper": "2026-12-10T18:30:05.484665821Z"
     }
   },
   "mostFrequentSignOffBlocker": {
     "baseline": "pages",
     "preview": "pages"
+  },
+  "finishDates": {
+    "baseline": [
+      {
+        "at": "2026-12-09T00:00:00Z",
+        "count": 1
+      },
+      {
+        "at": "2026-12-10T00:00:00Z",
+        "count": 22
+      },
+      {
+        "at": "2026-12-11T00:00:00Z",
+        "count": 383
+      },
+      {
+        "at": "2026-12-12T00:00:00Z",
+        "count": 103
+      },
+      {
+        "at": "2026-12-13T00:00:00Z",
+        "count": 3
+      }
+    ],
+    "preview": [
+      {
+        "at": "2026-12-11T00:00:00Z",
+        "count": 1
+      },
+      {
+        "at": "2026-12-12T00:00:00Z",
+        "count": 11
+      },
+      {
+        "at": "2026-12-13T00:00:00Z",
+        "count": 208
+      },
+      {
+        "at": "2026-12-14T00:00:00Z",
+        "count": 229
+      },
+      {
+        "at": "2026-12-15T00:00:00Z",
+        "count": 58
+      },
+      {
+        "at": "2026-12-16T00:00:00Z",
+        "count": 5
+      }
+    ]
   }
 }

@@ -1,5 +1,6 @@
 import { ForecastChart } from "@haakco/custd-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { Link, useLocation } from "react-router";
 import example from "../data/plan-example.json";
 import { formatDate, formatShortDate } from "../lib/dates";
 import { PlanProgress } from "./PlanProgress";
@@ -13,32 +14,56 @@ const parts = example.inputs.parts.map((part) => ({
 const DAY_MS = 86_400_000;
 const names = new Map(example.inputs.parts.map((part) => [part.id, part.name]));
 
+function inspect(id: string) {
+  const detail = document.getElementById(`example-part-${id}`);
+  if (!(detail instanceof HTMLDetailsElement)) return;
+  detail.open = true;
+  detail.querySelector("summary")?.focus();
+}
+
+const signOff = example.inputs.parts.find((part) => part.id === "sign-off");
+const baselineDuration = signOff?.durationDays?.join("–");
+const previewDuration = signOff?.previewDurationDays?.join("–");
+const chance = (value: number) => `${Math.round(value * 100)}%`;
+
 export default function PlanExample() {
   const [preview, setPreview] = useState(false);
   const [showCanvas, setShowCanvas] = useState(false);
-  const [meetingStage, setMeetingStage] = useState<"ready" | "review" | "decide" | "ended">("ready");
+  const { hash } = useLocation();
   const scenario = preview ? "preview" : "baseline";
   const forecast = example[scenario];
-  function inspect(id: string) {
-    const detail = document.querySelector<HTMLDetailsElement>(`#example-part-${CSS.escape(id)}`);
-    if (!detail) return;
-    detail.open = true;
-    detail.querySelector("summary")?.focus();
-  }
+  const duration = preview ? previewDuration : baselineDuration;
 
-  const chance = (value: number) => `${Math.round(value * 100)}%`;
+  useEffect(() => {
+    if (hash.startsWith("#example-part-")) inspect(hash.slice("#example-part-".length));
+  }, [hash]);
+
   return (
     <div className="more__body">
-      <p className="small muted">Example plan · fictional measurements</p>
-      <h2>Launch the new site</h2>
-      <h3>Likely done {formatDate(forecast.median)}</h3>
+      <p className="small muted">Example plan · fictional tasks and measurements</p>
+      <h1>Launch the new site</h1>
+      <p>Editing and checks can run in parallel. Launch sign-off starts after both finish.</p>
+      <h2>Likely done {formatDate(forecast.median)}</h2>
+      <p>90% forecast range · {formatDate(forecast.lower)} to {formatDate(forecast.upper)}</p>
       <p>{chance(forecast.deadlineProbability)} chance by {formatDate(example.inputs.deadline)}</p>
       <p role="status">
-        {preview ? `Likely finish moved from ${formatDate(example.baseline.median)} to ${formatDate(example.preview.median)}. Deadline chance rose from ${chance(example.baseline.deadlineProbability)} to ${chance(example.preview.deadlineProbability)}.` : ""}
+        {preview ? `Likely finish moved from ${formatDate(example.baseline.median)} to ${formatDate(forecast.median)}. The forecast range is now ${formatDate(forecast.lower)} to ${formatDate(forecast.upper)}. Deadline chance moved from ${chance(example.baseline.deadlineProbability)} to ${chance(forecast.deadlineProbability)}.` : ""}
       </p>
+      <p>Launch sign-off estimate · {duration} days</p>
       <button type="button" className="button button--primary" onClick={() => { setPreview(!preview); }}>
-        {preview ? "Reset preview" : "Preview 25 pages edited"}
+        {preview ? "Reset sign-off estimate" : `Allow ${previewDuration} days for sign-off`}
       </button>
+      <p>Monte Carlo simulation samples a possible duration for each task and applies the dependencies on each of {example.inputs.trials} runs. The median splits the simulated finishes in half. The 90% range shows the middle 90% of finishes, and the deadline chance counts runs that finished by the deadline.</p>
+      <p><Link to="/help/forecasting">Forecasting guide</Link></p>
+      <details className="more">
+        <summary>Simulated finish dates</summary>
+        <table className="estimates">
+          <thead><tr><th scope="col">Finish date</th><th scope="col">Runs</th></tr></thead>
+          <tbody>{example.finishDates[scenario].map(({ at, count }) => (
+            <tr key={at}><th scope="row">{formatDate(at)}</th><td>{count}</td></tr>
+          ))}</tbody>
+        </table>
+      </details>
       <p>{forecast.completedParts} of {forecast.requiredParts} required parts complete</p>
       <p>Most often blocking sign-off: {names.get(example.mostFrequentSignOffBlocker[scenario])}</p>
       <PlanProgress forecast={forecast} deadline={example.inputs.deadline} />
@@ -47,9 +72,9 @@ export default function PlanExample() {
           const history = part.measurements?.map((value, index, values) => ({
             at: new Date(Date.parse(example.inputs.asOf) +
               (index - values.length + 1) * example.inputs.measurementIntervalDays * DAY_MS).toISOString(),
-            value: preview && index === values.length - 1 ? part.previewValue ?? value : value,
+            value,
           }));
-          const fit = Object.entries(example.partForecasts[scenario]).find(([id]) => id === part.id)?.[1];
+          const fit = Object.entries(example.partForecasts).find(([id]) => id === part.id)?.[1];
           return (
             <li key={part.id}>
               <details className="more" id={`example-part-${part.id}`}>
@@ -73,7 +98,7 @@ export default function PlanExample() {
                     ))}</ul>
                   </>
                 ) : (
-                  <p>Allow 1–2 days after pages and checks are both complete.</p>
+                  <p>Allow {duration} days after pages and checks are both complete.</p>
                 )}
               </details>
             </li>
@@ -84,34 +109,8 @@ export default function PlanExample() {
         <summary>Dependency canvas</summary>
         {showCanvas ? <Suspense fallback={<p>Loading canvas…</p>}><PlanCanvas parts={parts} names={names} inspect={inspect} /></Suspense> : null}
       </details>
-      <section className="section" aria-label="Example meeting">
-        <h3>Launch review</h3>
-        <p>10 minutes planned · Review progress, then decide what to do next.</p>
-        {meetingStage === "ready" ? <button type="button" className="button" onClick={() => { setMeetingStage("review"); }}>Start sample meeting</button> : null}
-        {meetingStage === "review" ? (
-          <>
-            <p role="timer" aria-label="Sample meeting elapsed">0:00 elapsed</p>
-            <p role="status">Review progress · 5 min left. Up next: Decide next steps. Projected finish: 10 min after start.</p>
-            <button type="button" className="button" onClick={() => { setMeetingStage("decide"); }}>Finish review after 3 min</button>
-          </>
-        ) : null}
-        {meetingStage === "decide" ? (
-          <>
-            <p role="timer" aria-label="Sample meeting elapsed">3:00 elapsed</p>
-            <p role="status">Decide next steps · 7 min left (originally 5). Review finished 2 min early. Projected finish: 10 min after start.</p>
-            <button type="button" className="button" onClick={() => { setMeetingStage("ended"); }}>Finish decisions after 8 min</button>
-          </>
-        ) : null}
-        {meetingStage === "ended" ? (
-          <div role="status">
-            <p>Planned 10 min. Took 11 min. Finished 1 min late.</p>
-            <p>Review progress · 5 min planned · 3 min actual</p>
-            <p>Decide next steps · 5 min planned · 7 min allocated · 8 min actual</p>
-            <p>Decision · Keep the launch date.</p>
-            <p>Action · <a href="#example-part-pages" onClick={() => { inspect("pages"); }}>Finish editing the remaining pages</a>.</p>
-          </div>
-        ) : null}
-      </section>
+      <p><Link className="button button--primary" to="/new/plan">Start a plan</Link></p>
+      <p><Link to="/examples/dashboard">See the sample dashboard</Link></p>
     </div>
   );
 }
