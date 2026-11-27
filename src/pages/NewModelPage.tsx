@@ -23,6 +23,9 @@ function ModelForm({ data }: { data: DoneWhenData }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [starter, setStarter] = useState(false);
+  const [printingLow, setPrintingLow] = useState(300);
+  const [printingHigh, setPrintingHigh] = useState(500);
   const [expiry, setExpiry] = useState(DEFAULT_EXPIRY_SECONDS);
   const create = useMutation({
     mutationFn: (draft: ModelDraft) => data.createModel(draft),
@@ -33,12 +36,34 @@ function ModelForm({ data }: { data: DoneWhenData }) {
       className="form"
       onSubmit={(event) => {
         event.preventDefault();
-        create.mutate({ name: name.trim(), description: description.trim(), expiresAfterSeconds: expiry });
+        create.mutate({
+          name: name.trim(), description: description.trim(), expiresAfterSeconds: expiry,
+          ...(starter ? { quantities: [
+            { name: "printing", kind: "input", input: { shape: "range", low: printingLow, high: printingHigh, distribution: "uniform" }, unit: "$" },
+            { name: "delivery", kind: "input", input: { shape: "range", low: 50, high: 150, distribution: "uniform" }, unit: "$" },
+            { name: "total", kind: "formula", formula: "printing + delivery", unit: "$" },
+          ] } : {}),
+        });
       }}
     >
       <Field label="What are you working out?" hint="For example: monthly hosting cost, people needed for launch.">
         {(control) => <input {...control} required maxLength={255} value={name} onChange={(event) => { setName(event.target.value); }} />}
       </Field>
+      <label className="inline-action">
+        <input type="checkbox" checked={starter} onChange={(event) => { setStarter(event.target.checked); }} />
+        Start with a printing and delivery cost model
+      </label>
+      {starter ? (
+        <div className="field-row">
+          <Field label="Printing low estimate ($)">
+            {(control) => <input {...control} type="number" min={0} max={printingHigh - 1} required value={printingLow} onChange={(event) => { setPrintingLow(event.target.valueAsNumber); }} />}
+          </Field>
+          <Field label="Printing high estimate ($)">
+            {(control) => <input {...control} type="number" min={printingLow + 1} required value={printingHigh} onChange={(event) => { setPrintingHigh(event.target.valueAsNumber); }} />}
+          </Field>
+          <p>Delivery begins at $50–150. Total adds both costs.</p>
+        </div>
+      ) : null}
       <details className="more">
         <summary>More options: description, expiry</summary>
         <div className="more__body">

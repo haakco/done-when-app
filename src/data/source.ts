@@ -11,6 +11,9 @@ import {
   APP_MEETING_ERROR_CODES,
   AppItemError,
   type AppItemRead,
+  type AppItemRunPage,
+  type AppItemMeasurementPage,
+  type AppRunCreateRequest,
   type AppPlanForecast,
   type AppPlanUpdate,
   type AppItemsClient,
@@ -71,6 +74,9 @@ export type DoneWhenData = {
   setForecast(owner: ItemAccess, forecast: ForecastSettings): Promise<void>;
   setRunSimilar(owner: ItemAccess, similar: boolean): Promise<void>;
   reopenCounter(owner: ItemAccess): Promise<void>;
+  startCounterRun(owner: ItemAccess, request: AppRunCreateRequest): Promise<AppItemRead>;
+  listCounterRuns(access: ItemAccess, after?: string): Promise<AppItemRunPage>;
+  counterRunMeasurements(access: ItemAccess, runUuid: string): Promise<AppItemMeasurementPage>;
 
   createProject(draft: ProjectDraft): Promise<CreatedItem>;
   addEstimate(owner: ItemAccess, estimate: EstimateDraft): Promise<void>;
@@ -171,6 +177,15 @@ export function createDoneWhenData(items: AppItemsClient, trackModel?: (event: M
     },
     async reopenCounter(owner) {
       await items.reopen(owner);
+    },
+    startCounterRun(owner, request) {
+      return items.startRun(owner, request);
+    },
+    listCounterRuns(access, after) {
+      return items.listRuns(access, after ? { after } : {});
+    },
+    counterRunMeasurements(access, runUuid) {
+      return items.listMeasurements(access, { run: runUuid, limit: MEASUREMENT_BATCH });
     },
 
     async createProject(draft) {

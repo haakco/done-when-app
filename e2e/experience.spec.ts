@@ -114,9 +114,11 @@ test("starter model labels previous results and a mixed dashboard recovers its f
     await retry.click();
     await expect(modelTile).toContainText("total: about 650");
     await expect(retry).toHaveCount(0);
-    await modelTile.getByRole("link", { name: "Open Launch print budget" }).click();
-    await expect(page).toHaveURL(modelUrl);
-    await expect(page.getByRole("button", { name: "Run model", exact: true })).toHaveCount(0);
+    const dashboardUrl = await copyShareUrl(page);
+    await display.goto(dashboardUrl);
+    await display.getByRole("link", { name: "Open Launch print budget" }).click();
+    await expect(display).toHaveURL(modelUrl);
+    await expect(display.getByRole("button", { name: "Run model", exact: true })).toHaveCount(0);
   } finally {
     await viewer.close();
   }

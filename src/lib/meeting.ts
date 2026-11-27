@@ -3,15 +3,7 @@
 // its extra time from the blocks after it in proportion to their length, as Custd's run engine
 // does, so the agenda on screen matches what the next read will say.
 
-import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES, type AppMeeting as SdkMeeting, type AppMeetingBlock as SdkMeetingBlock } from "@haakco/custd-sdk/browser";
-
-export type MeetingAdjustment = {
-  blockUuid: string;
-  changes: { blockUuid: string; beforeMs: number; afterMs: number }[];
-};
-
-export type AppMeetingBlock = SdkMeetingBlock & { allocatedAtStartMs?: number };
-export type AppMeeting = Omit<SdkMeeting, "blocks"> & { blocks: AppMeetingBlock[] | null; adjustments?: MeetingAdjustment[] };
+import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES, type AppMeeting, type AppMeetingBlock } from "@haakco/custd-sdk/browser";
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;

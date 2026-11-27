@@ -11,6 +11,9 @@ import type {
   AppItemCreated,
   AppItemLink,
   AppItemRead,
+  AppItemRunPage,
+  AppItemMeasurementPage,
+  AppRunCreateRequest,
   AppItemSummary,
   AppLinkCollectionEntry,
   AppMeasurementBulkResponse,
@@ -43,6 +46,7 @@ type Link = AppItemLink & { token: string; itemUuid: string };
 
 type Alerts = { rules: AppAlertRule[]; webhooks: AppAlertWebhook[]; subscribers: Set<string>; deliveries: AppAlertDelivery[] };
 
+
 type Stored = {
   uuid: string;
   kind: AppItem["kind"];
@@ -57,6 +61,7 @@ type Stored = {
   meeting?: AppMeeting & { lastFinished: string | null };
   modelRuns: AppModelRun[];
   observations: { observedAt: string; value: number }[];
+  previousRuns: { project: AppMeasurementProject; observations: Stored["observations"] }[];
   estimates: AppProjectEstimate[];
   entries: AppLinkCollectionEntry[];
   runs: AppForecastRun[];
@@ -95,8 +100,7 @@ export class FakeCustd {
   private userCount = 0;
   /** Every request the fake answered, for assertions such as "no token in a URL". */
   readonly requests: FakeRequest[] = [];
-  /** How far `advanceClock` has moved the fake's meeting clock past the real one. */
-  private clockOffsetMs = 0;
+  private meetingClockMs: number | null = null;
 
   constructor(private readonly options: FakeCustdOptions) {}
 
@@ -120,13 +124,12 @@ export class FakeCustd {
     };
   }
 
-  /** Moves the meeting clock on, as the browser clock is moved with `page.clock.fastForward`. */
-  advanceClock(ms: number): void {
-    this.clockOffsetMs += ms;
+  setMeetingClock(ms: number): void {
+    this.meetingClockMs = ms;
   }
 
   private now(): number {
-    return Date.now() + this.clockOffsetMs;
+    return this.meetingClockMs ?? Date.now();
   }
 
   handle(request: FakeRequest): FakeResponse {
@@ -180,19 +183,29 @@ export class FakeCustd {
       case "PATCH /api/v1/app/item/meeting/minutes":
         return json(200, this.change(caller, () => { this.updateMeetingMinutes(caller.item, body as AppMeetingMinutesUpdate); }));
       case "PATCH /api/v1/app/item/plan":
-        return json(200, this.change(caller, () => { this.updatePlan(caller.item, body as AppPlanUpdate); }));
+        return json(200, this.change(caller, () => { this.updatePlan(caller, body as AppPlanUpdate); }));
       case "GET /api/v1/app/item/plan/forecast": {
         const plan = caller.item.plan;
         if (!plan) throw new Problem(409, "app_item_wrong_kind");
-        const requiredParts = plan.parts.filter((part) => part.required).length;
+        const required = plan.parts.filter((part) => part.required);
+        const missingParts = required.filter(({ itemUuid }) => {
+          const part = this.items.get(itemUuid);
+          return !part?.estimates.length && !part?.observations.length;
+        }).map(({ itemUuid }) => itemUuid);
         return json(200, {
           revision: plan.revision, asOf: caller.item.updatedAt, horizon: "2036-11-19T00:00:00Z",
-          model: "independent_finish_to_start_v1", requiredParts, completedParts: 0, missingParts: [],
-          ...(requiredParts ? { median: "2026-12-05T00:00:00Z", previousMedian: "2026-12-08T00:00:00Z", deadlineProbability: 0.75 } : {}),
+          model: "independent_finish_to_start_v1", requiredParts: required.length, completedParts: 0, missingParts,
+          ...(required.length && !missingParts.length ? { median: "2026-12-05T00:00:00Z", previousMedian: "2026-12-08T00:00:00Z", deadlineProbability: 0.75 } : {}),
         });
       }
       case "POST /api/v1/app/item/claim":
         return json(200, this.claim(caller));
+      case "GET /api/v1/app/item/runs":
+        return json(200, this.counterRuns(caller.item, url));
+      case "POST /api/v1/app/item/runs":
+        return json(201, this.change(caller, () => { this.startCounterRun(caller.item, body as AppRunCreateRequest); }));
+      case "GET /api/v1/app/item/measurements":
+        return json(200, this.counterMeasurements(caller.item, url));
       case "POST /api/v1/app/item/measurements":
         return json(200, this.measure(caller, body.rows as { observedAt: string; value: number }[]));
       case "POST /api/v1/app/item/estimates":
@@ -330,6 +343,7 @@ export class FakeCustd {
       updatedAt: now,
       ownerUser: user,
       observations: [],
+      previousRuns: [],
       estimates: [],
       entries: [],
       runs: [],
@@ -405,14 +419,16 @@ export class FakeCustd {
     item.meetingMinutes = { minutes, decisions, actions, ...(planUuid ? { planUuid } : {}), ...(sharedSummary ? { sharedSummary } : {}) };
   }
 
-  private updatePlan(item: Stored, request: AppPlanUpdate): void {
+  private updatePlan({ item, user }: Caller, request: AppPlanUpdate): void {
     if (!item.plan || request.expectedRevision !== item.plan.revision) {
       throw new Problem(409, "app_plan_revision_conflict");
     }
     const existing = new Set(item.plan.parts.map((part) => part.itemUuid));
     const parts = request.parts.map(({ itemUuid, required, prerequisites, linkToken }) => {
       const link = linkToken ? this.links.get(linkToken) : null;
-      if (!existing.has(itemUuid) && link?.itemUuid !== itemUuid) throw new Problem(404, "app_item_not_found");
+      const owned = user !== null && this.items.get(itemUuid)?.ownerUser === user;
+      const authorized = linkToken ? link?.itemUuid === itemUuid : existing.has(itemUuid) || owned;
+      if (!authorized) throw new Problem(404, "app_item_not_found");
       return { itemUuid, required, prerequisites };
     });
     item.plan = { revision: item.version + 1, parts, ...(item.plan.name ? { name: item.plan.name } : {}), ...(request.deadline ? { deadline: request.deadline } : {}) };
@@ -442,6 +458,7 @@ export class FakeCustd {
     if (item.project) {
       read.measurementProject = structuredClone(item.project);
       read.estimates = this.estimateList(item);
+      read.measurementRuns = this.counterRuns(item);
     }
     if (item.kind === "link_collection") read.linkCollection = { entries: item.entries };
     if (item.plan) {
@@ -505,6 +522,70 @@ export class FakeCustd {
     if (project.target) project.target.state = "active";
   }
 
+  private counterRuns(item: Stored, url?: URL): AppItemRunPage {
+    const current = this.projectOf(item);
+    const runs = [current, ...item.previousRuns.map((run) => run.project)];
+    const after = url?.searchParams.get("after");
+    const offset = after ? runs.findIndex((run) => run.projectUuid === after) + 1 : 0;
+    const limit = Number(url?.searchParams.get("limit") ?? 20);
+    const page = runs.slice(offset, offset + limit);
+    const next = page.at(-1)?.projectUuid;
+    return {
+      runs: page.map(({ projectUuid, name, status, createdAt }) => ({ runUuid: projectUuid, name, status, createdAt })),
+      ...(next && offset + limit < runs.length ? { nextCursor: next } : {}),
+    };
+  }
+
+  private startCounterRun(item: Stored, request: AppRunCreateRequest): void {
+    const previous = this.projectOf(item);
+    if ([previous, ...item.previousRuns.map((run) => run.project)].some((run) => run.projectCode === request.projectCode)) {
+      throw new Problem(409, "app_item_conflict");
+    }
+    item.previousRuns.unshift({ project: previous, observations: item.observations });
+    item.observations = [];
+    item.runs = [];
+    const now = new Date().toISOString();
+    const forecastMethod = previous.run.forecastMethod;
+    const target = previous.target ? {
+      targetUuid: crypto.randomUUID(),
+      targetCode: previous.target.targetCode,
+      name: previous.target.name,
+      targetValue: previous.target.targetValue,
+      state: "active",
+      ...(request.targetDate ? { targetDate: request.targetDate } : {}),
+    } : null;
+    item.project = {
+      projectUuid: crypto.randomUUID(),
+      projectCode: request.projectCode,
+      kind: previous.kind,
+      name: request.name ?? previous.name,
+      description: previous.description,
+      status: "active",
+      series: (previous.series ?? []).map((series) => ({ ...series, seriesUuid: crypto.randomUUID() })),
+      ...(target ? { target } : {}),
+      delivery: { definitionOfDone: previous.delivery.definitionOfDone },
+      run: { seriesRootUuid: previous.run.seriesRootUuid ?? previous.projectUuid, similar: true, ...(forecastMethod ? { forecastMethod } : {}) },
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  private counterMeasurements(item: Stored, url: URL): AppItemMeasurementPage {
+    const current = this.projectOf(item);
+    const requested = url.searchParams.get("run") ?? current.projectUuid;
+    const run = requested === current.projectUuid
+      ? { project: current, observations: item.observations }
+      : item.previousRuns.find(({ project }) => project.projectUuid === requested);
+    if (!run) throw new Problem(404, "app_item_not_found");
+    const limit = Number(url.searchParams.get("limit") ?? 100);
+    const rows = [...run.observations].sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt));
+    return {
+      runUuid: requested,
+      rows: rows.slice(0, limit).map((row) => ({ ...row, observationUuid: crypto.randomUUID(), seriesUuid: run.project.series?.[0]?.seriesUuid ?? "" })),
+      ...(rows.length > limit ? { nextCursor: "more" } : {}),
+    };
+  }
+
   private measure(caller: Caller, rows: { observedAt: string; value: number }[]): AppMeasurementBulkResponse {
     const item = this.owner(caller);
     const project = this.projectOf(item);
@@ -562,13 +643,12 @@ export class FakeCustd {
     const link = this.links.get(token);
     const target = link ? this.items.get(link.itemUuid) : undefined;
     if (!target) throw new Problem(404, "app_item_not_found");
-    // Meetings are collectable here so the dashboard tile can be proven; Custd's applinks registry
-    // does not mark them collectable yet (KindMeeting in libs/go/applinks/kinds.go).
     if (target.kind === "link_collection") throw new Problem(422, "app_item_not_collectable");
     const entry: AppLinkCollectionEntry = {
       entryUuid: crypto.randomUUID(),
       itemUuid: target.uuid,
       kind: target.kind,
+      ...(link?.role === "share" ? { shareToken: token } : {}),
       position: item.entries.length,
       createdAt: new Date().toISOString(),
     };
@@ -768,7 +848,7 @@ export class FakeCustd {
     meeting.endsAt = iso(now + blocks.reduce((sum, block) => sum + block.predictedMs, 0));
     const first = blocks[0];
     if (!first) return;
-    Object.assign(first, { status: "active", startedAt: iso(now) });
+    Object.assign(first, { status: "active", startedAt: iso(now), allocatedAtStartMs: first.allocatedMs });
     meeting.currentBlockUuid = first.blockUuid;
   }
 
@@ -777,10 +857,10 @@ export class FakeCustd {
     if (blockUuid === meeting.lastFinished) return this.read(caller);
     if (meeting.status !== "running" || blockUuid !== meeting.currentBlockUuid) throw new Problem(409, "app_item_meeting_step_refused");
     return this.change(caller, () => {
-      const now = this.finishCurrent(meeting);
+      const now = this.finishCurrent(meeting, "advance");
       const next = (meeting.blocks ?? []).find((block) => block.status === "pending" && block.allocatedMs > 0);
       if (next && now < Date.parse(meeting.endsAt ?? "")) {
-        Object.assign(next, { status: "active", startedAt: iso(now) });
+        Object.assign(next, { status: "active", startedAt: iso(now), allocatedAtStartMs: next.allocatedMs });
         meeting.currentBlockUuid = next.blockUuid;
       } else this.closeMeeting(meeting);
     });
@@ -789,11 +869,11 @@ export class FakeCustd {
   private endMeeting(item: Stored): void {
     const meeting = this.meetingOf(item);
     if (meeting.status !== "running") throw new Problem(409, "app_item_meeting_step_refused");
-    this.finishCurrent(meeting);
+    this.finishCurrent(meeting, "end");
     this.closeMeeting(meeting);
   }
 
-  private finishCurrent(meeting: AppMeeting & { lastFinished: string | null }): number {
+  private finishCurrent(meeting: AppMeeting & { lastFinished: string | null }, action: "advance" | "end"): number {
     const now = this.now();
     const blocks = meeting.blocks ?? [];
     const active = blocks.find((block) => block.blockUuid === meeting.currentBlockUuid);
@@ -804,7 +884,15 @@ export class FakeCustd {
     const pending = blocks.filter((block) => block.status === "pending");
     const total = pending.reduce((sum, block) => sum + block.allocatedMs, 0);
     const budget = Math.max(0, Date.parse(meeting.endsAt ?? "") - now);
-    for (const block of pending) block.allocatedMs = total === 0 ? 0 : Math.floor((budget * block.allocatedMs) / total);
+    if (active && action === "advance") {
+      const changes = pending.map((block) => {
+        const beforeMs = block.allocatedMs;
+        const afterMs = total === 0 ? 0 : Math.floor((budget * beforeMs) / total);
+        block.allocatedMs = afterMs;
+        return { blockUuid: block.blockUuid, beforeMs, afterMs };
+      });
+      meeting.adjustments = [...(meeting.adjustments ?? []), { blockUuid: active.blockUuid, changes }];
+    }
     meeting.summary.overrunMs = Math.max(0, now - Date.parse(meeting.endsAt ?? ""));
     delete meeting.currentBlockUuid;
     return now;

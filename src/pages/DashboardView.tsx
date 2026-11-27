@@ -1,6 +1,6 @@
 import { APP_MEETING_STATUSES, type AppItemRead } from "@haakco/custd-sdk/browser";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { DownloadMenu } from "../components/DownloadMenu";
 import { Field } from "../components/Field";
@@ -18,7 +18,7 @@ import { modelOutputs } from "./ModelView";
 import { dashboardWorkbook } from "../lib/exports";
 import { counterSummary, modelHeadline, projectSummary } from "../lib/forecast-text";
 import { recentItems, savedShareToken } from "../lib/device";
-import { tokenFromPaste } from "../lib/links";
+import { sharePath, tokenFromPaste } from "../lib/links";
 import { formatDate } from "../lib/dates";
 import { meetingLine } from "../lib/meeting";
 import { useNow } from "../lib/use-now";
@@ -45,7 +45,7 @@ export function DashboardView({ data, access, read, live, showOwnerTools, ownerR
       </ItemHeader>
       {count === 0 ? (
         <p className="notice">
-          Nothing here yet.{showOwnerTools ? " Add a counter, project, model or meeting below." : ""}
+          Nothing here yet.{showOwnerTools ? " Add a counter, project estimate, plan, model or meeting below." : ""}
         </p>
       ) : null}
       <ul className="card-grid dashboard-grid" aria-label="Dashboard items">
@@ -84,11 +84,16 @@ function EntryCard({ data, access, entry, owner }: EntryProps) {
   const remove = useMutation({ mutationFn: () => data.removeDashboardEntry(access, entry.entryUuid) });
   let body;
   let name = "Item";
+  let kindLabel = "";
+  let detailPath: string | null = null;
   if (read.status === "loading") body = <p className="small muted">Loading…</p>;
-  else if (read.status === "error") body = <p className="small muted">{isGone(read.error) ? "This item has expired or its link was replaced." : explainError(read.error)}</p>;
+  else if (read.status === "error") body = <TileError message={isGone(read.error) ? "This item has expired or its link was replaced." : explainError(read.error)} retry={read.refresh} />;
   else {
     name = itemNameOf(read.data);
     const kind = itemKindOf(read.data);
+    kindLabel = { plan: "Plan", project: "Project estimate", model: "Model", meeting: "Meeting", counter: "Counter", dashboard: "Dashboard" }[kind];
+    const token = entry.shareToken ?? savedShareToken(entry.itemUuid);
+    detailPath = token ? sharePath(kind, token) : null;
     if (kind === "plan") body = <PlanEntry data={data} access={access} read={read.data} />;
     else if (kind === "project") body = <ProjectEntry read={read.data} />;
     else if (kind === "model") body = <ModelEntry access={access} read={read.data} item={entry.itemUuid} />;
@@ -96,9 +101,10 @@ function EntryCard({ data, access, entry, owner }: EntryProps) {
     else body = <CounterEntry access={access} read={read.data} item={entry.itemUuid} />;
   }
   return (
-    <li className="card entry">
-      <h2 className="entry__name">{name}</h2>
+    <DashboardTile name={name} kind={kindLabel}>
       {body}
+      {read.status === "ready" && read.freshness !== "fresh" ? <p className="small muted">Showing the last update.</p> : null}
+      {detailPath ? <Link className="dashboard-detail" to={detailPath}>Open {name}</Link> : null}
       {owner ? (
         <>
           <button type="button" className="button button--quiet" disabled={remove.isPending} onClick={() => { remove.mutate(); }}>
@@ -107,7 +113,26 @@ function EntryCard({ data, access, entry, owner }: EntryProps) {
           <WriteError error={remove.error} />
         </>
       ) : null}
+    </DashboardTile>
+  );
+}
+
+export function DashboardTile({ name, kind, children }: { name: string; kind: string; children: ReactNode }) {
+  return (
+    <li className="card entry">
+      {kind ? <p className="small muted">{kind}</p> : null}
+      <h2 className="entry__name">{name}</h2>
+      {children}
     </li>
+  );
+}
+
+function TileError({ message, retry }: { message: string; retry: () => void }) {
+  return (
+    <>
+      <p className="small" role="status">{message}</p>
+      <button className="button button--quiet dashboard-detail" type="button" onClick={retry}>Retry item</button>
+    </>
   );
 }
 
@@ -119,19 +144,21 @@ function PlanEntry({ data, access, read }: { data: DoneWhenData; access: ItemAcc
     refetchInterval: 30_000,
   });
   if (forecast.isPending) return <p className="small muted">Loading forecast…</p>;
-  if (forecast.isError) return <WriteError error={forecast.error} />;
+  if (forecast.isError && !forecast.data) return <TileError message={explainError(forecast.error)} retry={() => { void forecast.refetch(); }} />;
   const result = forecast.data;
   return (
     <>
       <p className="entry__headline">{result.median ? `Likely done ${formatDate(result.median)}` : "Forecast coming soon"}</p>
       <p className="small">{result.completedParts} of {result.requiredParts} required parts complete</p>
+      {forecast.isError ? <p className="small muted">Showing the last forecast.</p> : null}
     </>
   );
 }
 
 function CounterEntry({ access, read, item }: { access: ItemAccess; read: AppItemRead; item: string }) {
   const live = useCounter(access, read, { item });
-  if (live.status !== "ready") return <p className="small muted">Loading…</p>;
+  if (live.status === "error") return <TileError message={explainError(live.error)} retry={live.refresh} />;
+  if (live.status === "loading") return <p className="small muted">Loading…</p>;
   const counter = live.data;
   const summary = counterSummary(counter);
   return (
@@ -139,6 +166,7 @@ function CounterEntry({ access, read, item }: { access: ItemAccess; read: AppIte
       {counter.status === "completed" ? <StatusBadge status="completed" /> : null}
       <p className="entry__headline">{summary.headline}</p>
       <Progress label={`${counter.name} progress`} current={counter.latestValue} start={counter.startValue} target={counter.targetValue} unit={counter.unit} />
+      {live.freshness !== "fresh" ? <p className="small muted">Showing the last forecast.</p> : null}
     </>
   );
 }
@@ -159,10 +187,13 @@ function ModelEntry({ access, read, item }: { access: ItemAccess; read: AppItemR
   const model = modelOf(read);
   const run = useModelRun(access, { item });
   const output = modelOutputs(model)[0];
+  if (run.status === "error") return <TileError message={explainError(run.error)} retry={run.refresh} />;
+  if (run.status === "loading") return <p className="small muted">Loading results…</p>;
   return (
     <>
       <p className="small muted">Model{model.latestVersion > 0 ? ` · version ${model.latestVersion}` : ""}</p>
-      <p className="entry__headline">{modelHeadline(output, run.status === "ready" ? run.data : null)}</p>
+      <p className="entry__headline">{modelHeadline(output, run.data)}</p>
+      {run.freshness !== "fresh" ? <p className="small muted">Showing the last model run.</p> : null}
     </>
   );
 }
@@ -194,7 +225,7 @@ function AddEntryForm({ data, access, entries }: { data: DoneWhenData; access: I
   const add = useMutation({ mutationFn: (value: string) => data.addDashboardEntry(access, value) });
   return (
     <section className="section card" aria-labelledby="add-entry-heading">
-      <h2 id="add-entry-heading">Add a counter, project, model or meeting</h2>
+      <h2 id="add-entry-heading">Add a counter, project estimate, plan, model or meeting</h2>
       {choices.length > 0 ? (
         <form className="form" onSubmit={(event) => {
           event.preventDefault();

@@ -13,19 +13,19 @@ import { MethodField } from "./MethodField";
 import { CsvField } from "./MeasurementForms";
 import { WriteError } from "./ItemStates";
 
-export type CounterFormValues = { name: string; unit: string; startValue: string; targetValue: string; startedAt: string; deadline: string; history: string };
+type CounterFormValues = { name: string; unit: string; startValue: string; targetValue: string; startedAt: string; deadline: string; history: string };
 
-export const EMPTY_COUNTER: CounterFormValues = { name: "", unit: "", startValue: "0", targetValue: "", startedAt: "", deadline: "", history: "" };
+const EMPTY_COUNTER: CounterFormValues = { name: "", unit: "", startValue: "0", targetValue: "", startedAt: "", deadline: "", history: "" };
 
 /** Router state after creating a counter: how many start or history rows Custd refused. */
 export type CreatedState = { rejected: number };
 
-type CounterFormProps = { data: DoneWhenData; initial?: CounterFormValues; moreOpen?: boolean };
+type CounterFormProps = { data: DoneWhenData; moreOpen?: boolean };
 
 /** The common task in one form: name, target, create. Everything else waits behind "More options". */
-export function CounterForm({ data, initial = EMPTY_COUNTER, moreOpen = false }: CounterFormProps) {
+export function CounterForm({ data, moreOpen = false }: CounterFormProps) {
   const navigate = useNavigate();
-  const [form, setForm] = useState(initial);
+  const [form, setForm] = useState(EMPTY_COUNTER);
   const [expiry, setExpiry] = useState(DEFAULT_EXPIRY_SECONDS);
   const [method, setMethod] = useState<ForecastMethod>(DEFAULT_FORECAST_METHOD);
   const [rowErrors, setRowErrors] = useState<CsvRowError[]>([]);

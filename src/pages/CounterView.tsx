@@ -1,9 +1,9 @@
 import { ArrivalHistogram, ForecastChart } from "@haakco/custd-react";
 import { useMutation } from "@tanstack/react-query";
 import { lazy, Suspense, useCallback, useId, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation } from "react-router";
 import { AlertsPanel } from "../components/AlertsPanel";
-import type { CreatedState, CounterFormValues } from "../components/CounterForm";
+import type { CreatedState } from "../components/CounterForm";
 import { Field } from "../components/Field";
 import { ItemFailed, Loading, ReadOnlyNotice, WriteError } from "../components/ItemStates";
 import { LiveLine } from "../components/LiveLine";
@@ -27,13 +27,13 @@ import { formatRate, RATE_UNITS, ratePerSecond, type RateUnit } from "../lib/rat
 import { forecastDates, type ForecastDates } from "../lib/moments";
 import { useGuessBook } from "../lib/use-guess-book";
 import { useNarrow } from "../lib/use-narrow";
-import type { NewRunState } from "./NewCounterPage";
+import { CounterRuns } from "./CounterRuns";
 import type { ItemViewProps } from "./view-props";
 
 const GuessFirst = lazy(() => import("../components/GuessFirst").then((module) => ({ default: module.GuessFirst })));
 const GuessResults = lazy(() => import("../components/GuessFirst").then((module) => ({ default: module.GuessResults })));
 
-export function CounterView({ data, access, read, showOwnerTools, ownerRoute, tv }: ItemViewProps) {
+export function CounterView({ data, access, read, live: itemLive, showOwnerTools, ownerRoute, tv }: ItemViewProps) {
   const live = useCounter(access, read);
   const book = useGuessBook(read.item.itemUuid);
   const location = useLocation();
@@ -42,6 +42,7 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute, tv
   if (live.status === "error") return <ItemFailed error={live.error} what="counter" />;
   const counter = live.data;
   const summary = counterSummary(counter);
+  const latest = counter.measurements.at(-1);
   // A share-page viewer may guess before the forecast shows; owners, TVs and done counters never wait.
   const guessing = !ownerRoute && !tv && counter.status === "active" && !book.revealed;
   return (
@@ -82,6 +83,7 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute, tv
         )}
         <Progress label="Progress to target" current={counter.latestValue} start={counter.startValue} target={counter.targetValue} unit={counter.unit} />
         <RateLine measurements={counter.measurements} unit={counter.unit} />
+        {latest ? <p className="small">Latest measurement: {latest.value.toLocaleString()} {counter.unit} on {formatDate(latest.measuredAt)}.</p> : null}
         {!guessing && !tv && book.guesses.length > 0 ? (
           <Suspense fallback={null}>
             <GuessResults book={book} completedAt={counter.status === "completed" ? counter.completedAt : null} />
@@ -93,6 +95,16 @@ export function CounterView({ data, access, read, showOwnerTools, ownerRoute, tv
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
       {guessing ? null : <ForecastDetail counter={counter} />}
       {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
+      {!tv && read.measurementProject && (showOwnerTools || (read.measurementRuns?.runs?.length ?? 0) > 1) ? (
+        <CounterRuns
+          data={data}
+          access={access}
+          counter={counter}
+          currentRunUuid={read.measurementProject.projectUuid}
+          owner={showOwnerTools}
+          refresh={() => { itemLive.refresh(); live.refresh(); }}
+        />
+      ) : null}
       {showOwnerTools ? <CounterOwnerTools data={data} access={access} counter={counter} /> : null}
     </article>
   );
@@ -325,12 +337,6 @@ function CounterOwnerTools({ data, access, counter }: { data: DoneWhenData; acce
         </div>
       </details>
       <details className="more">
-        <summary>Runs</summary>
-        <div className="more__body">
-          <RunsPanel data={data} access={access} counter={counter} />
-        </div>
-      </details>
-      <details className="more">
         <summary>Alerts</summary>
         <div className="more__body">
           <AlertsPanel data={data} access={access} kind="counter" />
@@ -374,54 +380,5 @@ function ForecastSettingsForm({ data, access, counter }: { data: DoneWhenData; a
       {counter.measurements.length < 3 ? <p className="small muted">Needs three measurements first.</p> : null}
       <WriteError error={save.error} />
     </form>
-  );
-}
-
-function RunsPanel({ data, access, counter }: { data: DoneWhenData; access: ItemAccess; counter: Counter }) {
-  const navigate = useNavigate();
-  const similar = useMutation({ mutationFn: (next: boolean) => data.setRunSimilar(access, next) });
-  const id = useId();
-  const newRun: NewRunState = {
-    newRun: {
-      name: counter.name,
-      unit: counter.unit,
-      startValue: String(counter.startValue),
-      targetValue: String(counter.targetValue),
-      startedAt: "",
-      deadline: "",
-      history: "",
-    } satisfies CounterFormValues,
-  };
-  return (
-    <div className="stack">
-      {counter.seriesRootUuid ? (
-        <div className="inline-action">
-          <input
-            id={id}
-            type="checkbox"
-            checked={similar.variables ?? counter.runSimilar}
-            disabled={similar.isPending}
-            onChange={(event) => {
-              similar.mutate(event.target.checked);
-            }}
-          />
-          <label htmlFor={id}>Use this run&apos;s pace for the series forecast (untick if this run was unusual)</label>
-          <WriteError error={similar.error} />
-        </div>
-      ) : (
-        <p className="small muted">Doing it again? Start a new counter with the same name and target.</p>
-      )}
-      <div className="button-row">
-        <button
-          type="button"
-          className="button"
-          onClick={() => {
-            void navigate("/new/counter", { state: newRun });
-          }}
-        >
-          Start again with the same target
-        </button>
-      </div>
-    </div>
   );
 }

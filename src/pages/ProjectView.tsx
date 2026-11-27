@@ -11,7 +11,7 @@ import { StaleEstimateNudge } from "../components/Moments";
 import { KeepInMyItems, LinksAndExpiry } from "../components/OwnerSettings";
 import { ItemHeader } from "../components/ItemHeader";
 import { StatusBadge } from "../components/StatusBadge";
-import type { DoneWhenData, EstimateDraft, ItemAccess, Project } from "../data";
+import type { DoneWhenData, EstimateDraft, ItemAccess, Project, ProjectEstimate } from "../data";
 import { projectOf } from "../data/live";
 import { dateInputToRfc3339, formatDate, formatShortDate, rfc3339ToDateInput, todayDateInput } from "../lib/dates";
 import { projectWorkbook } from "../lib/exports";
@@ -28,6 +28,8 @@ const CalibrationCard = lazy(() => import("../components/Calibration").then((mod
 export function ProjectView({ data, access, read, live, showOwnerTools, ownerRoute }: ItemViewProps) {
   const project = projectOf(read);
   const summary = projectSummary(project);
+  const latestEstimate = project.estimates.at(-1);
+  const previousEstimate = project.estimates.at(-2);
   const narrow = useNarrow();
   const stale = project.status === "active" && project.latest !== null && project.latest.ageDays > STALE_AFTER_DAYS;
   return (
@@ -47,6 +49,10 @@ export function ProjectView({ data, access, read, live, showOwnerTools, ownerRou
       <section className="summary" aria-label="Summary">
         <p className="summary__headline">{summary.headline}</p>
         {summary.detail ? <p className="summary__detail">{summary.detail}</p> : null}
+        {latestEstimate ? <p className="small">Latest estimate recorded {formatDate(latestEstimate.estimatedAt)}.</p> : null}
+        {latestEstimate && previousEstimate && (latestEstimate.low !== previousEstimate.low || latestEstimate.high !== previousEstimate.high) ? (
+          <p className="small">Previous range {formatDate(previousEstimate.low)} – {formatDate(previousEstimate.high)}.</p>
+        ) : null}
         <p className="small">
           {project.deliveryTarget ? (
             <>
@@ -75,18 +81,18 @@ export function ProjectView({ data, access, read, live, showOwnerTools, ownerRou
         />
       </figure>
       <LiveLine freshness={live.freshness} lastUpdatedAt={live.lastUpdatedAt} />
-      <EstimateTable project={project} />
+      <EstimateTable estimates={project.estimates} />
       {ownerRoute && !showOwnerTools ? <ReadOnlyNotice /> : null}
       {showOwnerTools ? <ProjectOwnerTools data={data} access={access} project={project} /> : null}
     </article>
   );
 }
 
-function EstimateTable({ project }: { project: Project }) {
-  if (project.estimates.length === 0) return null;
+export function EstimateTable({ estimates }: { estimates: ProjectEstimate[] }) {
+  if (estimates.length === 0) return null;
   return (
     <details className="more section">
-      <summary>All estimates ({project.estimates.length})</summary>
+      <summary>All estimates ({estimates.length})</summary>
       <div className="table-scroll more__body">
         <table className="estimates">
           <thead>
@@ -98,7 +104,7 @@ function EstimateTable({ project }: { project: Project }) {
             </tr>
           </thead>
           <tbody>
-            {[...project.estimates].reverse().map((estimate) => (
+            {[...estimates].reverse().map((estimate) => (
               <tr key={`${estimate.estimatedAt}-${estimate.low}-${estimate.high}`}>
                 <td>{formatDate(estimate.estimatedAt)}</td>
                 <td>{formatDate(estimate.low)}</td>

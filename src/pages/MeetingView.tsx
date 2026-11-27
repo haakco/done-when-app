@@ -1,5 +1,5 @@
 import { useAppMeeting } from "@haakco/custd-react";
-import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES } from "@haakco/custd-sdk/browser";
+import { APP_MEETING_BLOCK_STATUSES, APP_MEETING_STATUSES, type AppMeeting, type AppMeetingAdjustment } from "@haakco/custd-sdk/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DownloadMenu } from "../components/DownloadMenu";
@@ -12,7 +12,7 @@ import { isStaleMeetingStep, type DoneWhenData, type ItemAccess } from "../data"
 import { meetingOf } from "../data/live";
 import { formatTime } from "../lib/dates";
 import { meetingWorkbook } from "../lib/exports";
-import { blockTiming, clockPhase, formatClock, formatLength, liveAgenda, meetingOutcome, signedClock, type AppMeeting, type ClockPhase, type CurrentBlock, type LiveAgenda, type MeetingAdjustment } from "../lib/meeting";
+import { blockTiming, clockPhase, formatClock, formatLength, liveAgenda, meetingOutcome, signedClock, type ClockPhase, type CurrentBlock, type LiveAgenda } from "../lib/meeting";
 import { useNow } from "../lib/use-now";
 import "../styles/meeting.css";
 import { MeetingMinutes } from "./MeetingMinutes";
@@ -286,7 +286,7 @@ function MeetingHistory({ blocks, meeting }: { blocks: NonNullable<AppMeeting["b
         {blocks.map((block) => {
           const ran = block.status === APP_MEETING_BLOCK_STATUSES.completed;
           const allowance = block.allocatedAtStartMs;
-          const adjustment: MeetingAdjustment | undefined = adjustments.get(block.blockUuid);
+          const adjustment: AppMeetingAdjustment | undefined = adjustments.get(block.blockUuid);
           const changes = adjustment?.changes.filter((change) => change.beforeMs !== change.afterMs) ?? [];
           return (
             <li key={block.blockUuid} className="agenda__row">

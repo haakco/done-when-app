@@ -1,5 +1,4 @@
-import { APP_MEETING_BLOCK_STATUSES as BLOCK, APP_MEETING_STATUSES as MEETING } from "@haakco/custd-sdk/browser";
-import type { AppMeeting, AppMeetingBlock, MeetingAdjustment } from "../lib/meeting";
+import { APP_MEETING_BLOCK_STATUSES as BLOCK, APP_MEETING_STATUSES as MEETING, type AppMeeting, type AppMeetingBlock, type AppMeetingAdjustment } from "@haakco/custd-sdk/browser";
 
 export const MEETING_EXAMPLE_START = Date.parse("2026-12-01T10:00:00");
 const MINUTE = 60_000;
@@ -48,7 +47,7 @@ export function meetingExample(step: MeetingExampleStep): AppMeeting {
     };
   });
   const finished = blocks.filter(({ status }) => status === BLOCK.completed);
-  const adjustments: MeetingAdjustment[] = [];
+  const adjustments: AppMeetingAdjustment[] = [];
   if (step >= 2) adjustments.push({
     blockUuid: sampleMeetingAgenda[0].blockUuid,
     changes: sampleMeetingAgenda.slice(1).map(({ blockUuid }) => ({ blockUuid, beforeMs: 5 * MINUTE, afterMs: 6 * MINUTE })),

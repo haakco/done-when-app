@@ -46,7 +46,7 @@ export async function createCounter(page: Page, name: string, target: string, hi
 
 /** Presses the Share button beside the title and returns the view-only link it copied. */
 export async function copyShareUrl(page: Page): Promise<string> {
-  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await page.getByRole("button", { name: "Share view-only link", exact: true }).click();
   await page.getByText("View-only link copied.").waitFor();
   return page.evaluate(() => navigator.clipboard.readText());
 }

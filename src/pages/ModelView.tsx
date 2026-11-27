@@ -130,6 +130,7 @@ function ModelResults({ model, run, outputs }: { model: Model; run: AppModelRun 
     <>
       <section className="summary" aria-label="Summary">
         <p className="summary__headline">{headline(mainResult, units)}</p>
+        {!currentVersion ? <p className="notice notice--warn">These results are from version {run.versionNumber}. The model is now on version {model.latestVersion}.</p> : null}
         <p className="summary__detail small">
           From {run.sampleCount.toLocaleString("en")} simulated trials of version {run.versionNumber}, {formatDate(run.createdAt)}.
         </p>

@@ -16,6 +16,8 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 
 const PlanExample = lazy(() => import("./pages/PlanExample"));
 const MeetingExample = lazy(() => import("./pages/MeetingExample"));
+const ProjectExample = lazy(() => import("./pages/ProjectExample"));
+const ModelExample = lazy(() => import("./pages/ModelExample"));
 const DashboardExample = lazy(() => import("./pages/DashboardExample"));
 const ForecastingGuide = lazy(() => import("./pages/ForecastingGuide").then(({ ForecastingGuide }) => ({ default: ForecastingGuide })));
 
@@ -32,6 +34,8 @@ export function App() {
           <Route path="plan" element={<PlanExample />} />
           <Route path="meeting" element={<MeetingExample />} />
           <Route path="dashboard" element={<DashboardExample />} />
+          <Route path="project" element={<ProjectExample />} />
+          <Route path="model" element={<ModelExample />} />
         </Route>
         <Route path="help/forecasting" element={<Suspense fallback={<p role="status">Loading guide…</p>}><ForecastingGuide /></Suspense>} />
         <Route path="new/counter" element={<NewCounterPage />} />

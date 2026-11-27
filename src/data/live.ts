@@ -12,7 +12,7 @@ export type Freshness = "fresh" | "stale" | "offline";
 
 export type LiveView<T> =
   | { status: "loading" }
-  | { status: "error"; error: AppItemError }
+  | { status: "error"; error: AppItemError; refresh: () => void }
   | { status: "ready"; data: T; freshness: Freshness; lastUpdatedAt: Date | null; refresh: () => void };
 
 type Live<T> = CustdAppLiveResult<T>;
@@ -38,7 +38,7 @@ export function useItemRead(access: ItemAccess | null, options: Options = {}): L
   const data = dataOf(live);
   return useMemo((): LiveView<AppItemRead> => {
     if (data === undefined) {
-      if (live.status === APP_LIVE_STATUSES.error || live.status === APP_LIVE_STATUSES.offline) return { status: "error", error: live.error };
+      if (live.status === APP_LIVE_STATUSES.error || live.status === APP_LIVE_STATUSES.offline) return { status: "error", error: live.error, refresh: live.refresh };
       return { status: "loading" };
     }
     return { status: "ready", data, freshness: freshnessOf([live]), lastUpdatedAt: lastUpdatedOf(live), refresh: live.refresh };
@@ -53,7 +53,7 @@ export function useCounter(access: ItemAccess, read: AppItemRead, options: Optio
   const forecastData = dataOf(forecast);
   return useMemo((): LiveView<Counter> => {
     if (storyData === undefined) {
-      if (story.status === APP_LIVE_STATUSES.error || story.status === APP_LIVE_STATUSES.offline) return { status: "error", error: story.error };
+      if (story.status === APP_LIVE_STATUSES.error || story.status === APP_LIVE_STATUSES.offline) return { status: "error", error: story.error, refresh: story.refresh };
       return { status: "loading" };
     }
     const counter = toCounter(read, storyData.observations ?? [], forecastData ?? null, storyData.truncated);
@@ -91,7 +91,7 @@ export function useModelRun(access: ItemAccess, options: Options = {}): LiveView
       return { status: "ready", data: null, freshness: "fresh", lastUpdatedAt: live.lastUpdatedAt, refresh: live.refresh };
     }
     if (data === undefined) {
-      if (live.status === APP_LIVE_STATUSES.error || live.status === APP_LIVE_STATUSES.offline) return { status: "error", error: live.error };
+      if (live.status === APP_LIVE_STATUSES.error || live.status === APP_LIVE_STATUSES.offline) return { status: "error", error: live.error, refresh: live.refresh };
       return { status: "loading" };
     }
     return { status: "ready", data, freshness: freshnessOf([live]), lastUpdatedAt: lastUpdatedOf(live), refresh: live.refresh };

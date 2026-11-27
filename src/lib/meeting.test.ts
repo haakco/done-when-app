@@ -1,5 +1,6 @@
+import type { AppMeeting, AppMeetingBlock } from "@haakco/custd-sdk/browser";
 import { describe, expect, it } from "vitest";
-import { blockTiming, clockPhase, signedClock, type AppMeeting, type AppMeetingBlock, durationWords, formatClock, formatDifference, formatLength, liveAgenda, meetingOutcome } from "./meeting";
+import { blockTiming, clockPhase, signedClock, durationWords, formatClock, formatDifference, formatLength, liveAgenda, meetingOutcome } from "./meeting";
 
 const MIN = 60_000;
 const START = Date.parse("2026-11-18T10:00:00Z");

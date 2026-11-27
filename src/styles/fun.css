@@ -120,3 +120,21 @@ main.page--tv {
 .tv-exit:focus { top: var(--space-2); }
 
 .big-screen-link { font-size: var(--text-sm); }
+
+.page--tv .dashboard-detail { display: none; }
+
+.example-range {
+  position: relative;
+  block-size: var(--space-2);
+  margin-block: var(--space-3);
+  background: var(--color-line);
+  border-radius: var(--radius);
+}
+
+.example-range span {
+  position: absolute;
+  inset-block: 0;
+  background: var(--color-forecast);
+  border-radius: inherit;
+  transition: inset-inline-start var(--motion-calm) var(--ease), inline-size var(--motion-calm) var(--ease);
+}
