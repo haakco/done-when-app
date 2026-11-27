@@ -110,7 +110,7 @@ export type AgendaBlockDraft = { title: string; minutes: number };
 
 export type MeetingDraft = { name: string; blocks: AgendaBlockDraft[]; expiresAfterSeconds: number };
 
-export type DashboardEntry = { entryUuid: string; itemUuid: string };
+export type DashboardEntry = { entryUuid: string; itemUuid: string; shareToken?: string };
 
 export type Dashboard = ItemMeta & { entries: DashboardEntry[] };
 

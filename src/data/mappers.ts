@@ -219,7 +219,11 @@ export function toDashboard(read: AppItemRead): Dashboard {
     entries: (read.linkCollection?.entries ?? [])
       .slice()
       .sort((a, b) => a.position - b.position)
-      .map((entry) => ({ entryUuid: entry.entryUuid, itemUuid: entry.itemUuid })),
+      .map((entry) => ({
+        entryUuid: entry.entryUuid,
+        itemUuid: entry.itemUuid,
+        ...(entry.shareToken ? { shareToken: entry.shareToken } : {}),
+      })),
   };
 }
 
