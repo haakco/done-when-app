@@ -38,6 +38,7 @@ test("create a counter from CSV, share it live, set an alert, then sign in and c
   await page.getByLabel("New value").fill("55");
   await page.getByRole("button", { name: "Add measurement" }).click();
   await expect(viewerPage.getByRole("progressbar", { name: "Progress to target" })).toHaveAttribute("aria-valuetext", /55 of 100/);
+  await expect(viewerPage.getByText(/Latest measurement: 55/)).toBeVisible();
   await viewer.close();
 
   // Alerts: a rule and a webhook; reaching the target fires it.
@@ -54,9 +55,12 @@ test("create a counter from CSV, share it live, set an alert, then sign in and c
   await expect(page.getByRole("heading", { level: 3, name: "Recent alerts" })).toBeVisible();
   await expect(page.getByText(/webhook · sent/)).toBeVisible();
 
-  // Sign in from the owner page and keep the counter in My items.
-  await page.getByText("Links, expiry and my items").click();
+  // An empty signed-in account still lets the owner recover and claim a device item.
+  await page.getByRole("link", { name: "My items" }).click();
   await page.getByRole("main").getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText(/No items in your account yet/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "New model" })).toBeVisible();
+  await page.getByRole("link", { name: "Pages written" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Pages written" })).toBeVisible();
   await page.getByText("Links, expiry and my items").click();
   await page.getByRole("button", { name: "Add to my items" }).click();
